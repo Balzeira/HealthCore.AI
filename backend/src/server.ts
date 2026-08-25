@@ -7,6 +7,7 @@ import { facilitiesRouter } from './routes/facilities.js';
 import { evaluationsRouter } from './routes/evaluations.js';
 import { predispositionRouter } from './routes/predisposition.js';
 import { gameRouter } from './routes/game.js';
+import { newsRouter } from './routes/news.js';
 
 async function startServer() {
   try {
@@ -28,6 +29,7 @@ async function startServer() {
     app.use('/api/evaluations', evaluationsRouter(db));
     app.use('/api/predisposition', predispositionRouter(db));
     app.use('/api/game', gameRouter(db));
+    app.use('/api/news', newsRouter());
 
     app.listen(PORT, () => {
       console.log(`Server is running on http://localhost:${PORT}`);
@@ -40,6 +42,7 @@ async function startServer() {
       console.log('  POST /api/predisposition/calculate');
       console.log('  GET  /api/game/questions');
       console.log('  POST /api/game/submit');
+      console.log('  GET  /api/news');
     });
   } catch (error) {
     console.error('Failed to start server:', error);
