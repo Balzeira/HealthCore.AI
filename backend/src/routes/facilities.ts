@@ -18,14 +18,33 @@ export function facilitiesRouter(db: Database) {
 
   router.get('/', (req: Request, res: Response) => {
     try {
-      const { lat, lng, radius, region_id } = req.query;
+      const { lat, lng, radius, region_id, type, is_24h, is_emergency, search } = req.query;
 
-      let sql = 'SELECT * FROM health_facilities';
+      let sql = 'SELECT * FROM health_facilities WHERE 1=1';
       const params: any[] = [];
 
       if (region_id) {
-        sql += ' WHERE region_id = ?';
+        sql += ' AND region_id = ?';
         params.push(parseInt(region_id as string, 10));
+      }
+
+      if (type) {
+        sql += ' AND type = ?';
+        params.push(type as string);
+      }
+
+      if (is_24h === '1' || is_24h === 'true') {
+        sql += ' AND is_24h = 1';
+      }
+
+      if (is_emergency === '1' || is_emergency === 'true') {
+        sql += ' AND is_emergency = 1';
+      }
+
+      if (search) {
+        sql += ' AND (name LIKE ? OR address LIKE ? OR specialties LIKE ?)';
+        const term = `%${search as string}%`;
+        params.push(term, term, term);
       }
 
       const stmt = db.prepare(sql);
@@ -47,8 +66,8 @@ export function facilitiesRouter(db: Database) {
           return {
             ...f,
             distance_km: parseFloat(dist.toFixed(2)),
-            walking_time_mins: Math.round(dist / 5 * 60), // Assuming 5km/h walking speed
-            driving_time_mins: Math.round(dist / 30 * 60) // Assuming 30km/h driving speed
+            walking_time_mins: Math.max(1, Math.round(dist / 5 * 60)), // Assuming 5km/h walking speed
+            driving_time_mins: Math.max(1, Math.round(dist / 30 * 60)) // Assuming 30km/h driving speed
           };
         });
 

@@ -26,12 +26,17 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [newsLoading, setNewsLoading] = useState(true);
   const [regions, setRegions] = useState<any[]>([]);
+  const [cityStats, setCityStats] = useState<any>(null);
+  const [selectedNeighborhoodId, setSelectedNeighborhoodId] = useState<number>(4); // Vila Mariana default
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
+  const [newsFilter, setNewsFilter] = useState<string>('Todos');
+  const [newsSearch, setNewsSearch] = useState<string>('');
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [countdown, setCountdown] = useState<number>(1200); // 20 minutes = 1200s
 
   useEffect(() => {
     fetchRegions();
+    fetchCityStats();
     fetchNews();
   }, []);
 
@@ -40,7 +45,7 @@ export default function HomePage() {
     const timer = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
-          fetchNews(); // Auto-refresh every 20 min
+          fetchNews();
           return 1200;
         }
         return prev - 1;
@@ -58,6 +63,15 @@ export default function HomePage() {
       console.error("Failed to load regions", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCityStats = async () => {
+    try {
+      const data = await api.get<any>('/stats');
+      if (data) setCityStats(data);
+    } catch (err) {
+      console.error("Failed to load city stats", err);
     }
   };
 
@@ -89,49 +103,101 @@ export default function HomePage() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Mock neighborhood metrics for interactive selector
+  const neighborhoodPresets: Record<number, any> = {
+    1: { name: 'Sé', risk: 'Alto', riskColor: '#FF3B30', riskBg: '#FFE5E3', aqi: '120 • Ruim', humidity: '52%', dengue: 'Alta (120 casos/100k)', area: 'Região Central' },
+    2: { name: 'Pinheiros', risk: 'Baixo', riskColor: '#34C759', riskBg: '#E8F8EE', aqi: '45 • Excelente', humidity: '62%', dengue: 'Baixa (15 casos/100k)', area: 'Zona Oeste' },
+    3: { name: 'Itaquera', risk: 'Alto', riskColor: '#FF3B30', riskBg: '#FFE5E3', aqi: '110 • Moderado', humidity: '58%', dengue: 'Alta (300 casos/100k)', area: 'Zona Leste' },
+    4: { name: 'Vila Mariana', risk: 'Baixo', riskColor: '#34C759', riskBg: '#E8F8EE', aqi: '42 • Excelente', humidity: '65%', dengue: 'Nula / Baixa (32 casos/100k)', area: 'Zona Sul' },
+    5: { name: 'Moema', risk: 'Baixo', riskColor: '#34C759', riskBg: '#E8F8EE', aqi: '38 • Ótima', humidity: '68%', dengue: 'Controlada (12 casos/100k)', area: 'Zona Sul' },
+    6: { name: 'Bela Vista', risk: 'Médio', riskColor: '#F5A623', riskBg: '#FFF3E0', aqi: '78 • Moderado', humidity: '56%', dengue: 'Média (90 casos/100k)', area: 'Região Central' }
+  };
+
+  const currentMetrics = neighborhoodPresets[selectedNeighborhoodId] || neighborhoodPresets[4];
+
+  const filteredNews = newsList.filter(item => {
+    const matchesCat = newsFilter === 'Todos' || item.category.toLowerCase().includes(newsFilter.toLowerCase());
+    const matchesSearch = item.title.toLowerCase().includes(newsSearch.toLowerCase()) || item.summary.toLowerCase().includes(newsSearch.toLowerCase());
+    return matchesCat && matchesSearch;
+  });
+
   return (
     <div className="home-page" style={{ padding: '20px', maxWidth: '430px', margin: '0 auto', fontFamily: 'Inter, sans-serif', paddingBottom: '5rem' }}>
-      <header style={{ marginBottom: '20px' }}>
+      <header style={{ marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-          <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#0047AB', margin: 0 }}>Observatório de Saúde Urbana</h1>
-          <span style={{ backgroundColor: '#E8F8EE', color: '#2E7D32', fontSize: '11px', fontWeight: 700, padding: '4px 8px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ width: '6px', height: '6px', backgroundColor: '#34C759', borderRadius: '50%', display: 'inline-block' }}></span>
+          <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#0047AB', margin: 0, letterSpacing: '-0.5px' }}>Observatório de Saúde Urbana</h1>
+          <span style={{ backgroundColor: '#E8F8EE', color: '#2E7D32', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '14px', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 2px 6px rgba(52,199,89,0.2)' }}>
+            <span style={{ width: '7px', height: '7px', backgroundColor: '#34C759', borderRadius: '50%', display: 'inline-block', animation: 'pulse 1.5s infinite' }}></span>
             Ao Vivo
           </span>
         </div>
-        <p style={{ fontSize: '13px', color: '#666', margin: 0 }}>Monitoramento em tempo real • São Paulo</p>
+        <p style={{ fontSize: '13px', color: '#666', margin: 0 }}>São Paulo • Monitoramento Epidemiológico Inteligente</p>
       </header>
 
-      {/* Current Neighborhood Card */}
-      <section style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.06)', marginBottom: '20px', border: '1px solid #E5E7EB' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#1A1A2E' }}>Vila Mariana</h2>
-            <span style={{ fontSize: '11px', color: '#6B7280' }}>Zona Sul • São Paulo</span>
+      {/* City Overview Live Stats Bar */}
+      <section style={{ backgroundColor: 'linear-gradient(135deg, #0047AB 0%, #002D62 100%)', background: '#0047AB', borderRadius: '16px', padding: '14px', color: '#fff', marginBottom: '20px', boxShadow: '0 4px 16px rgba(0,71,171,0.25)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.9 }}>Panorama da Capital</span>
+          <span style={{ fontSize: '10px', backgroundColor: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: '10px', fontWeight: 600 }}>10 Bairros Ativos</span>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', textAlign: 'center' }}>
+          <div style={{ backgroundColor: 'rgba(255,255,255,0.12)', padding: '8px 4px', borderRadius: '10px', backdropFilter: 'blur(4px)' }}>
+            <div style={{ fontSize: '16px', fontWeight: 800 }}>{cityStats ? cityStats.risk_summary.high : 3}</div>
+            <div style={{ fontSize: '10px', opacity: 0.85 }}>Em Alerta 🔴</div>
           </div>
-          <span style={{ backgroundColor: '#E8F8EE', color: '#2E7D32', padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 800 }}>
-            ● Risco Baixo
+          <div style={{ backgroundColor: 'rgba(255,255,255,0.12)', padding: '8px 4px', borderRadius: '10px', backdropFilter: 'blur(4px)' }}>
+            <div style={{ fontSize: '16px', fontWeight: 800 }}>{cityStats ? `${cityStats.air_quality.avg_aqi} AQI` : '64 AQI'}</div>
+            <div style={{ fontSize: '10px', opacity: 0.85 }}>Média Ar 🌬️</div>
+          </div>
+          <div style={{ backgroundColor: 'rgba(255,255,255,0.12)', padding: '8px 4px', borderRadius: '10px', backdropFilter: 'blur(4px)' }}>
+            <div style={{ fontSize: '16px', fontWeight: 800 }}>{cityStats ? cityStats.community.active_agents_online : 184}</div>
+            <div style={{ fontSize: '10px', opacity: 0.85 }}>Agentes Online 👥</div>
+          </div>
+        </div>
+      </section>
+
+      {/* Current Neighborhood Card with Selector */}
+      <section style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.06)', marginBottom: '20px', border: '1px solid #E5E7EB' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: '11px', color: '#6B7280', fontWeight: 700, display: 'block', marginBottom: '2px' }}>SELECIONE O BAIRRO</label>
+            <select 
+              value={selectedNeighborhoodId}
+              onChange={(e) => setSelectedNeighborhoodId(Number(e.target.value))}
+              style={{ fontSize: '16px', fontWeight: 800, border: 'none', background: 'transparent', color: '#1A1A2E', outline: 'none', cursor: 'pointer', padding: 0 }}
+            >
+              <option value={4}>Vila Mariana (Zona Sul)</option>
+              <option value={1}>Sé (Região Central)</option>
+              <option value={2}>Pinheiros (Zona Oeste)</option>
+              <option value={3}>Itaquera (Zona Leste)</option>
+              <option value={5}>Moema (Zona Sul)</option>
+              <option value={6}>Bela Vista (Região Central)</option>
+            </select>
+          </div>
+          <span style={{ backgroundColor: currentMetrics.riskBg, color: currentMetrics.riskColor, padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 800, border: `1px solid ${currentMetrics.riskColor}40` }}>
+            ● Risco {currentMetrics.risk}
           </span>
         </div>
         
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
           <div style={{ backgroundColor: '#F9FAFB', padding: '12px', borderRadius: '12px', border: '1px solid #F3F4F6' }}>
             <p style={{ fontSize: '11px', color: '#6B7280', margin: '0 0 4px 0', fontWeight: 600 }}>Qualidade do Ar (AQI)</p>
-            <p style={{ fontSize: '16px', fontWeight: 800, margin: 0, color: '#34C759' }}>42 • Excelente</p>
+            <p style={{ fontSize: '15px', fontWeight: 800, margin: 0, color: '#34C759' }}>{currentMetrics.aqi}</p>
           </div>
           <div style={{ backgroundColor: '#F9FAFB', padding: '12px', borderRadius: '12px', border: '1px solid #F3F4F6' }}>
             <p style={{ fontSize: '11px', color: '#6B7280', margin: '0 0 4px 0', fontWeight: 600 }}>Umidade Relativa</p>
-            <p style={{ fontSize: '16px', fontWeight: 800, margin: 0, color: '#0047AB' }}>65% • Ideal</p>
+            <p style={{ fontSize: '15px', fontWeight: 800, margin: 0, color: '#0047AB' }}>{currentMetrics.humidity}</p>
           </div>
           <div style={{ backgroundColor: '#F9FAFB', padding: '12px', borderRadius: '12px', border: '1px solid #F3F4F6', gridColumn: 'span 2' }}>
-            <p style={{ fontSize: '11px', color: '#6B7280', margin: '0 0 4px 0', fontWeight: 600 }}>Incidência Arbovirose (Últimos 14 dias)</p>
-            <p style={{ fontSize: '15px', fontWeight: 800, margin: 0, color: '#F5A623' }}>Nula / Baixa (32 casos/100k hab)</p>
+            <p style={{ fontSize: '11px', color: '#6B7280', margin: '0 0 4px 0', fontWeight: 600 }}>Incidência Arbovirose</p>
+            <p style={{ fontSize: '14px', fontWeight: 800, margin: 0, color: currentMetrics.riskColor }}>{currentMetrics.dengue}</p>
           </div>
         </div>
 
         <button 
           onClick={() => navigate('/map')}
-          style={{ width: '100%', padding: '12px', backgroundColor: '#0047AB', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+          style={{ width: '100%', padding: '12px', backgroundColor: '#0047AB', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(0,71,171,0.2)' }}
         >
           Explorar Detalhes no Mapa ▶
         </button>
@@ -173,9 +239,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Live News Section (Requirement 3: Updated every 20 minutes) */}
+      {/* Live News Section */}
       <section>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
           <div>
             <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#1A1A2E' }}>Notícias em Tempo Real</h3>
             <span style={{ fontSize: '11px', color: '#6B7280' }}>
@@ -187,8 +253,34 @@ export default function HomePage() {
             disabled={newsLoading}
             style={{ backgroundColor: '#F3F4F6', color: '#374151', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
           >
-            🔄 {newsLoading ? 'Atualizando...' : 'Atualizar Agora'}
+            🔄 {newsLoading ? 'Atualizando...' : 'Atualizar'}
           </button>
+        </div>
+
+        {/* News Filters & Search */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+          <input 
+            type="text" 
+            placeholder="Pesquisar notícias..." 
+            value={newsSearch}
+            onChange={(e) => setNewsSearch(e.target.value)}
+            style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1px solid #E5E7EB', fontSize: '12px', outline: 'none' }}
+          />
+          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
+            {['Todos', 'Vacinação', 'Arboviroses', 'Ar & Ambiente', 'Vigilância'].map(cat => (
+              <button
+                key={cat}
+                onClick={() => setNewsFilter(cat)}
+                style={{
+                  padding: '5px 10px', borderRadius: '14px', fontSize: '11px', fontWeight: 700, border: 'none',
+                  backgroundColor: newsFilter === cat ? '#0047AB' : '#F3F4F6',
+                  color: newsFilter === cat ? '#FFF' : '#4B5563', cursor: 'pointer', whiteSpace: 'nowrap'
+                }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
         
         {newsLoading ? (
@@ -199,31 +291,35 @@ export default function HomePage() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {newsList.map((item) => (
-              <article key={item.id} style={{ backgroundColor: '#fff', padding: '14px', borderRadius: '14px', boxShadow: '0 2px 10px rgba(0,0,0,0.04)', border: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '10px', fontWeight: 800, color: item.category_color, backgroundColor: `${item.category_color}15`, padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
-                    {item.category}
-                  </span>
-                  <span style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 600 }}>
-                    ⏱ Há {item.minutes_ago} min • {item.read_time}
-                  </span>
-                </div>
-                
-                <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#1A1A2E', margin: 0, lineHeight: '1.4' }}>
-                  {item.title}
-                </h4>
+            {filteredNews.length === 0 ? (
+              <p style={{ fontSize: '12px', color: '#9CA3AF', textAlign: 'center', padding: '20px 0' }}>Nenhuma notícia encontrada para esta busca.</p>
+            ) : (
+              filteredNews.map((item) => (
+                <article key={item.id} style={{ backgroundColor: '#fff', padding: '14px', borderRadius: '14px', boxShadow: '0 2px 10px rgba(0,0,0,0.04)', border: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 800, color: item.category_color, backgroundColor: `${item.category_color}15`, padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+                      {item.category}
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 600 }}>
+                      ⏱ Há {item.minutes_ago} min • {item.read_time}
+                    </span>
+                  </div>
+                  
+                  <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#1A1A2E', margin: 0, lineHeight: '1.4' }}>
+                    {item.title}
+                  </h4>
 
-                <p style={{ fontSize: '12px', color: '#4B5563', margin: 0, lineHeight: '1.45' }}>
-                  {item.summary}
-                </p>
+                  <p style={{ fontSize: '12px', color: '#4B5563', margin: 0, lineHeight: '1.45' }}>
+                    {item.summary}
+                  </p>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #F3F4F6', paddingTop: '8px', marginTop: '4px' }}>
-                  <span style={{ fontSize: '10px', color: '#9CA3AF', fontWeight: 600 }}>Fonte: {item.source}</span>
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#0047AB' }}>Ver detalhes ▶</span>
-                </div>
-              </article>
-            ))}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #F3F4F6', paddingTop: '8px', marginTop: '4px' }}>
+                    <span style={{ fontSize: '10px', color: '#9CA3AF', fontWeight: 600 }}>Fonte: {item.source}</span>
+                    <span style={{ fontSize: '10px', fontWeight: 700, color: '#0047AB' }}>Ver detalhes ▶</span>
+                  </div>
+                </article>
+              ))
+            )}
           </div>
         )}
       </section>

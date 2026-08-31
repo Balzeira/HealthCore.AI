@@ -22,20 +22,37 @@ export default function FacilitiesPage() {
   const navigate = useNavigate();
   const [facilities, setFacilities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState<'Todos' | 'Hospital' | 'UBS' | '24h' | 'Emergência'>('Todos');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchFacilities = async () => {
-      try {
-        const data = await api.get<any[]>('/facilities?lat=-23.5505&lng=-46.6333&radius=5');
-        setFacilities(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error("Failed to load facilities", err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchFacilities();
   }, []);
+
+  const fetchFacilities = async () => {
+    setLoading(true);
+    try {
+      const data = await api.get<any>('/facilities?lat=-23.5505&lng=-46.6333&radius=5');
+      if (data && Array.isArray(data.facilities)) {
+        setFacilities(data.facilities);
+      } else if (Array.isArray(data)) {
+        setFacilities(data);
+      } else {
+        setFacilities(mockFacilities);
+      }
+    } catch (err) {
+      console.error("Failed to load facilities", err);
+      setFacilities(mockFacilities);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   // Mock data if API fails
   const mockFacilities = [

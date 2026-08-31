@@ -8,6 +8,7 @@ import { evaluationsRouter } from './routes/evaluations.js';
 import { predispositionRouter } from './routes/predisposition.js';
 import { gameRouter } from './routes/game.js';
 import { newsRouter } from './routes/news.js';
+import { statsRouter } from './routes/stats.js';
 
 async function startServer() {
   try {
@@ -30,11 +31,13 @@ async function startServer() {
     app.use('/api/predisposition', predispositionRouter(db));
     app.use('/api/game', gameRouter(db));
     app.use('/api/news', newsRouter());
+    app.use('/api/stats', statsRouter(db));
 
     app.listen(PORT, () => {
       console.log(`Server is running on http://localhost:${PORT}`);
       console.log('Available routes:');
       console.log('  GET  /api/health');
+      console.log('  GET  /api/stats');
       console.log('  GET  /api/regions');
       console.log('  GET  /api/regions/:id/details');
       console.log('  GET  /api/facilities');
