@@ -2,45 +2,125 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import L from 'leaflet';
-import { MapContainer, TileLayer, Marker } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// Fix leaflet marker icons
+// Fix leaflet default marker icons
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 let DefaultIcon = L.icon({
-    iconUrl: icon,
-    shadowUrl: iconShadow,
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
+  iconUrl: icon,
+  shadowUrl: iconShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
 });
 L.Marker.prototype.options.icon = DefaultIcon;
+
+// Custom colored pin markers for Hospital vs UBS
+const createFacilityMarkerIcon = (type: string) => {
+  const isHospital = type === 'Hospital';
+  const bg = isHospital ? '#0047AB' : '#34C759';
+  const symbol = isHospital ? '🏥' : '🩺';
+
+  return L.divIcon({
+    className: 'facility-custom-marker',
+    html: `
+      <div style="
+        background: ${bg};
+        color: white;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        border: 2px solid white;
+        cursor: pointer;
+      ">
+        ${symbol}
+      </div>
+    `,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16]
+  });
+};
+
+const FlyToLocation = ({ center }: { center: [number, number] }) => {
+  const map = useMap();
+  useEffect(() => {
+    map.flyTo(center, 14, { duration: 1.0 });
+  }, [center, map]);
+  return null;
+};
 
 export default function FacilitiesPage() {
   const navigate = useNavigate();
   const [facilities, setFacilities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number }>({ lat: -23.5505, lng: -46.6333 }); // Sé default
+  const [searchRadius, setSearchRadius] = useState<number>(5); // 5km default
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterType, setFilterType] = useState<'Todos' | 'Hospital' | 'UBS' | '24h' | 'Emergência'>('Todos');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchFacilities();
-  }, []);
+    // Try to get user geolocation
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          fetchFacilities(pos.coords.latitude, pos.coords.longitude, searchRadius);
+        },
+        () => {
+          fetchFacilities(userCoords.lat, userCoords.lng, searchRadius);
+        }
+      );
+    } else {
+      fetchFacilities(userCoords.lat, userCoords.lng, searchRadius);
+    }
+  }, [searchRadius]);
 
-  const fetchFacilities = async () => {
+  const fetchFacilities = async (lat: number, lng: number, radius: number) => {
     setLoading(true);
     try {
-      const data = await api.get<any>('/facilities?lat=-23.5505&lng=-46.6333&radius=5');
+      const data = await api.get<any>(`/facilities?lat=${lat}&lng=${lng}&radius=${radius}`);
+      let list = [];
       if (data && Array.isArray(data.facilities)) {
-        setFacilities(data.facilities);
+        list = data.facilities;
       } else if (Array.isArray(data)) {
-        setFacilities(data);
+        list = data;
       } else {
-        setFacilities(mockFacilities);
+        list = mockFacilities;
       }
+
+      // Normalize object fields for seamless rendering
+      const normalized = list.map((f: any) => {
+        const latitude = f.latitude ?? f.lat ?? -23.5505;
+        const longitude = f.longitude ?? f.lng ?? -46.6333;
+        const distKm = f.distance_km ?? calculateDistance(lat, lng, latitude, longitude);
+        return {
+          id: f.id,
+          name: f.name || 'Unidade de Saúde',
+          type: f.type || 'UBS',
+          address: f.address || 'São Paulo - SP',
+          phone: f.phone || '(11) 3000-0000',
+          latitude,
+          longitude,
+          distance_km: parseFloat(distKm.toFixed(2)),
+          walking_time_mins: f.walking_time_mins || Math.max(1, Math.round(distKm / 5 * 60)),
+          driving_time_mins: f.driving_time_mins || Math.max(1, Math.round(distKm / 30 * 60)),
+          is_24h: Boolean(f.is_24h || f.is24h),
+          is_emergency: Boolean(f.is_emergency || f.hasEmergency),
+          specialties: f.specialties || f.description || 'Atendimento de Saúde Urbana'
+        };
+      });
+
+      normalized.sort((a: any, b: any) => a.distance_km - b.distance_km);
+      setFacilities(normalized);
     } catch (err) {
       console.error("Failed to load facilities", err);
       setFacilities(mockFacilities);
@@ -49,177 +129,298 @@ export default function FacilitiesPage() {
     }
   };
 
+  function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Mock data if API fails
-  const mockFacilities = [
-    {
-      id: 1,
-      type: 'UBS',
-      name: 'UBS República',
-      status: 'open',
-      is24h: false,
-      distance: '450m',
-      timeToWalk: 'Aprox. 6 min a pé',
-      description: 'Atendimento básico, vacinação e consultas agendadas.',
-      address: 'Praça da República, 299',
-      phone: '(11) 3255-0000',
-      lat: -23.5435,
-      lng: -46.6433
-    },
-    {
-      id: 2,
-      type: 'Hospital',
-      name: 'Santa Casa de Misericórdia',
-      status: 'open',
-      is24h: true,
-      hasEmergency: true,
-      distance: '1.2km',
-      timeToWalk: 'Aprox. 15 min a pé',
-      description: 'Hospital geral, pronto socorro adulto e infantil, maternidade.',
-      address: 'Rua Dr. Cesário Mota Júnior, 112',
-      phone: '(11) 2176-7000',
-      lat: -23.5430,
-      lng: -46.6500
-    },
-    {
-      id: 3,
-      type: 'UBS',
-      name: 'UBS Sé',
-      status: 'closing_soon',
-      is24h: false,
-      distance: '1.5km',
-      timeToWalk: 'Aprox. 20 min a pé',
-      description: 'Atendimento básico de saúde da família.',
-      address: 'Rua Frederico Alvarenga, 259',
-      phone: '(11) 3105-0000',
-      lat: -23.5515,
-      lng: -46.6290
-    }
-  ];
+  const handleOpenRoute = (f: any) => {
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${f.latitude},${f.longitude}`;
+    window.open(url, '_blank');
+  };
 
-  const displayList = facilities.length > 0 ? facilities : mockFacilities;
+  const handleCall = (phone: string) => {
+    showToast(`Ligando para ${phone}...`);
+    window.location.href = `tel:${phone.replace(/\D/g, '')}`;
+  };
+
+  // Filter list by user criteria
+  const displayList = facilities.filter(f => {
+    const matchesSearch = f.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          f.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          f.specialties.toLowerCase().includes(searchQuery.toLowerCase());
+
+    let matchesFilter = true;
+    if (filterType === 'Hospital') matchesFilter = f.type === 'Hospital';
+    if (filterType === 'UBS') matchesFilter = f.type === 'UBS';
+    if (filterType === '24h') matchesFilter = f.is_24h === true;
+    if (filterType === 'Emergência') matchesFilter = f.is_emergency === true;
+
+    return matchesSearch && matchesFilter;
+  });
 
   return (
-    <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh', maxWidth: '430px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', maxWidth: '430px', margin: '0 auto', fontFamily: 'Inter, sans-serif', paddingBottom: '5rem' }}>
       
+      {/* Toast Banner */}
+      {toastMessage && (
+        <div style={{ position: 'fixed', top: '16px', left: '50%', transform: 'translateX(-50%)', zIndex: 2000, backgroundColor: '#0F172A', color: '#FFF', padding: '12px 18px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 700, boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>
+          {toastMessage}
+        </div>
+      )}
+
       {/* Header */}
-      <header style={{ backgroundColor: '#fff', padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', borderBottom: '1px solid #eee', position: 'sticky', top: 0, zIndex: 10 }}>
-        <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+      <header style={{ backgroundColor: '#fff', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #E2E8F0', position: 'sticky', top: 0, zIndex: 100 }}>
+        <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#0F172A' }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
         </button>
-        <h1 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0, color: '#333' }}>Hospitais Próximos - Região Sé</h1>
+        <div>
+          <h1 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: '#0F172A' }}>Hospitais & UBSs Próximos</h1>
+          <span style={{ fontSize: '11px', color: '#64748B' }}>Busca por Geolocalização e Proximidade</span>
+        </div>
       </header>
 
-      {/* Mini Map */}
-      <div style={{ height: '200px', width: '100%', position: 'relative' }}>
+      {/* Interactive Map view of facilities */}
+      <div style={{ height: '210px', width: '100%', position: 'relative' }}>
         <MapContainer 
-          center={[-23.5435, -46.6433]} 
+          center={[userCoords.lat, userCoords.lng]} 
           zoom={14} 
           style={{ height: '100%', width: '100%' }}
           zoomControl={false}
-          dragging={false}
-          scrollWheelZoom={false}
         >
-          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+          <FlyToLocation center={[userCoords.lat, userCoords.lng]} />
+          
+          {/* User Location Pulse Circle */}
+          <Circle 
+            center={[userCoords.lat, userCoords.lng]} 
+            radius={searchRadius * 1000} 
+            pathOptions={{ color: '#0047AB', fillColor: '#0047AB', fillOpacity: 0.1, weight: 2, dashArray: '4,4' }} 
+          />
+
+          {/* User Pin */}
+          <Marker position={[userCoords.lat, userCoords.lng]}>
+            <Popup>Você está aqui (Centro de Busca)</Popup>
+          </Marker>
+
+          {/* Facility Pins */}
           {displayList.map(f => (
-            <Marker key={f.id} position={[f.lat, f.lng]} />
+            <Marker 
+              key={f.id} 
+              position={[f.latitude, f.longitude]} 
+              icon={createFacilityMarkerIcon(f.type)}
+            >
+              <Popup>
+                <div style={{ minWidth: '150px', fontFamily: 'Inter, sans-serif' }}>
+                  <strong style={{ fontSize: '13px', color: '#0F172A', display: 'block', marginBottom: '4px' }}>{f.name}</strong>
+                  <span style={{ fontSize: '11px', color: '#0047AB', fontWeight: 700 }}>📍 {f.distance_km} km de você</span>
+                </div>
+              </Popup>
+            </Marker>
           ))}
         </MapContainer>
-        
-        {/* Radius Overlay */}
-        <div style={{ position: 'absolute', bottom: '12px', left: '16px', right: '16px', zIndex: 1000, backgroundColor: 'rgba(255,255,255,0.95)', padding: '12px 16px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0047AB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="4"></circle></svg>
-            <span style={{ fontSize: '14px', color: '#333', fontWeight: '500' }}>Buscando num raio de 2km</span>
+
+        {/* Proximity Radius Slider Overlay */}
+        <div style={{ position: 'absolute', bottom: '12px', left: '12px', right: '12px', zIndex: 1000, backgroundColor: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(10px)', padding: '10px 14px', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.1)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+            <span style={{ fontSize: '12px', color: '#0F172A', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
+              📍 Raio de Busca: <strong style={{ color: '#0047AB' }}>{searchRadius} km</strong>
+            </span>
+            <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>{displayList.length} Encontrados</span>
           </div>
-          <button style={{ background: 'none', border: 'none', color: '#0047AB', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', padding: 0 }}>Alterar</button>
+          <input 
+            type="range" 
+            min="1" 
+            max="15" 
+            step="1" 
+            value={searchRadius} 
+            onChange={(e) => setSearchRadius(Number(e.target.value))}
+            style={{ width: '100%', accentColor: '#0047AB', cursor: 'pointer' }}
+          />
         </div>
       </div>
 
-      {/* Content */}
+      {/* Main Content Area */}
       <div style={{ padding: '16px' }}>
         
-        {/* Filter Bar */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <button style={{ backgroundColor: '#eef2f6', color: '#0047AB', border: 'none', padding: '8px 16px', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            Mais Próximos
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-          </button>
-          <button style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
-          </button>
+        {/* Search Bar */}
+        <div style={{ marginBottom: '12px' }}>
+          <input 
+            type="text"
+            placeholder="Pesquisar por nome, endereço ou especialidade..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '13px', outline: 'none', backgroundColor: '#FFF', fontWeight: 500 }}
+          />
         </div>
 
-        {/* Facilities List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {displayList.map(facility => (
-            <div key={facility.id} style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-              
-              {/* Badges */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
-                <span style={{ backgroundColor: facility.type === 'UBS' ? 'rgba(52, 199, 89, 0.15)' : 'rgba(0, 71, 171, 0.15)', color: facility.type === 'UBS' ? '#28a745' : '#0047AB', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                  {facility.type === 'UBS' ? 'UNIDADE BÁSICA' : 'HOSPITAL GERAL'}
-                </span>
-                
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 'bold', color: facility.status === 'open' ? '#28a745' : '#F5A623', backgroundColor: '#f5f5f5', padding: '4px 8px', borderRadius: '6px' }}>
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: facility.status === 'open' ? '#28a745' : '#F5A623' }}></span>
-                  {facility.status === 'open' ? 'Aberto agora' : 'Fecha em 30 min'}
-                </span>
-
-                {facility.is24h && (
-                  <span style={{ backgroundColor: '#f5f5f5', color: '#666', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 'bold' }}>
-                    Plantão 24h
-                  </span>
-                )}
-                
-                {facility.hasEmergency && (
-                  <span style={{ backgroundColor: 'rgba(255, 59, 48, 0.15)', color: '#FF3B30', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                    EMERGÊNCIA
-                  </span>
-                )}
-              </div>
-
-              {/* Title & Distance */}
-              <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: '0 0 4px 0', color: '#333' }}>{facility.name}</h2>
-              <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#666', marginBottom: '12px' }}>
-                <span style={{ fontWeight: 'bold', color: '#0047AB' }}>{facility.distance}</span>
-                <span>{facility.timeToWalk}</span>
-              </div>
-
-              {/* Description */}
-              <p style={{ fontSize: '13px', color: '#555', lineHeight: '1.4', margin: '0 0 16px 0' }}>{facility.description}</p>
-
-              {/* Address & Phone */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: '#666' }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: '2px', flexShrink: 0 }}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-                  <span>{facility.address}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#666' }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-                  <span>{facility.phone}</span>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button style={{ flex: 1, backgroundColor: '#34C759', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-                  Como chegar
-                </button>
-                <button style={{ flex: 1, backgroundColor: 'transparent', color: '#0047AB', border: '2px solid #0047AB', padding: '10px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-                  Ligar
-                </button>
-              </div>
-
-            </div>
+        {/* Filter Pills */}
+        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '14px', scrollbarWidth: 'none' }}>
+          {(['Todos', 'Hospital', 'UBS', '24h', 'Emergência'] as const).map(type => (
+            <button
+              key={type}
+              onClick={() => setFilterType(type)}
+              style={{
+                padding: '6px 14px', borderRadius: '20px', fontSize: '11px', fontWeight: 800, border: 'none',
+                backgroundColor: filterType === type ? '#0047AB' : '#FFF',
+                color: filterType === type ? '#FFF' : '#475569', cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.05)', border: filterType === type ? 'none' : '1px solid #E2E8F0',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {type === 'Todos' ? '🏥 Todos' : type === 'Hospital' ? '🏥 Hospitais' : type === 'UBS' ? '🩺 UBSs' : type === '24h' ? '⏱ Plantão 24h' : '🚨 Emergência'}
+            </button>
           ))}
         </div>
+
+        {/* Facilities Cards List */}
+        {loading ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: '#64748B' }}>
+            <div style={{ width: '36px', height: '36px', border: '3px solid #0047AB', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }}></div>
+            <p style={{ fontSize: '13px', fontWeight: 600 }}>Calculando unidades mais próximas...</p>
+            <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+          </div>
+        ) : displayList.length === 0 ? (
+          <div style={{ backgroundColor: '#FFF', borderRadius: '16px', padding: '2rem', textAlign: 'center', border: '1px solid #E2E8F0' }}>
+            <p style={{ fontSize: '14px', color: '#64748B', margin: 0, fontWeight: 600 }}>Nenhuma unidade encontrada para este filtro ou raio.</p>
+            <button onClick={() => { setSearchRadius(15); setFilterType('Todos'); setSearchQuery(''); }} style={{ marginTop: '12px', padding: '8px 16px', backgroundColor: '#0047AB', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}>
+              Aumentar Raio para 15km
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {displayList.map(f => (
+              <div key={f.id} style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.04)', border: '1px solid #E2E8F0' }}>
+                
+                {/* Badges */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+                  <span style={{ backgroundColor: f.type === 'UBS' ? '#E8F8EE' : '#E8F0FE', color: f.type === 'UBS' ? '#2E7D32' : '#0047AB', padding: '4px 10px', borderRadius: '8px', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase' }}>
+                    {f.type === 'UBS' ? '🩺 UNIDADE BÁSICA (UBS)' : '🏥 HOSPITAL GERAL'}
+                  </span>
+                  
+                  {f.is_24h && (
+                    <span style={{ backgroundColor: '#F1F5F9', color: '#475569', padding: '4px 8px', borderRadius: '8px', fontSize: '10px', fontWeight: 700 }}>
+                      ⏱ Plantão 24h
+                    </span>
+                  )}
+                  
+                  {f.is_emergency && (
+                    <span style={{ backgroundColor: '#FFE5E3', color: '#FF3B30', padding: '4px 8px', borderRadius: '8px', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase' }}>
+                      🚨 EMERGÊNCIA
+                    </span>
+                  )}
+                </div>
+
+                {/* Title & Proximity Metrics */}
+                <h2 style={{ fontSize: '17px', fontWeight: 800, margin: '0 0 4px 0', color: '#0F172A' }}>{f.name}</h2>
+                
+                <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#475569', marginBottom: '10px', fontWeight: 600 }}>
+                  <span style={{ fontWeight: 800, color: '#0047AB', backgroundColor: '#E8F0FE', padding: '2px 8px', borderRadius: '6px' }}>
+                    📍 {f.distance_km} km de você
+                  </span>
+                  <span>🚶 ~{f.walking_time_mins} min a pé</span>
+                  <span>🚗 ~{f.driving_time_mins} min de carro</span>
+                </div>
+
+                {/* Specialties Description */}
+                <p style={{ fontSize: '12px', color: '#475569', lineHeight: '1.4', margin: '0 0 12px 0' }}>
+                  <strong>Especialidades:</strong> {f.specialties}
+                </p>
+
+                {/* Address & Phone */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px', fontSize: '12px', color: '#64748B' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                    <span>📌</span>
+                    <span>{f.address}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>📞</span>
+                    <span>{f.phone}</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button 
+                    onClick={() => handleOpenRoute(f)}
+                    style={{ flex: 1, backgroundColor: '#34C759', color: '#fff', border: 'none', padding: '12px', borderRadius: '10px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', boxShadow: '0 2px 8px rgba(52,199,89,0.25)' }}
+                  >
+                    🗺️ Como chegar (Rota)
+                  </button>
+                  <button 
+                    onClick={() => handleCall(f.phone)}
+                    style={{ flex: 1, backgroundColor: '#FFF', color: '#0047AB', border: '2px solid #0047AB', padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}
+                  >
+                    📞 Ligar
+                  </button>
+                </div>
+
+              </div>
+            ))}
+          </div>
+        )}
 
       </div>
     </div>
   );
 }
+
+// Fallback mock facilities if offline
+const mockFacilities = [
+  {
+    id: 1,
+    type: 'Hospital',
+    name: 'Hospital Santa Casa de Misericórdia',
+    address: 'R. Dr. Cesário Mota Júnior, 112 - Vila Buarque',
+    phone: '(11) 2176-7000',
+    latitude: -23.5430,
+    longitude: -46.6508,
+    is_24h: 1,
+    is_emergency: 1,
+    specialties: 'Geral, Traumatologia, Pediatria',
+    distance_km: 0.85,
+    walking_time_mins: 10,
+    driving_time_mins: 2
+  },
+  {
+    id: 2,
+    type: 'UBS',
+    name: 'UBS Sé',
+    address: 'Rua Frederico Alvarenga, 259 - Sé',
+    phone: '(11) 3105-8869',
+    latitude: -23.5510,
+    longitude: -46.6300,
+    is_24h: 0,
+    is_emergency: 0,
+    specialties: 'Clínica Geral, Ginecologia, Pediatria',
+    distance_km: 0.34,
+    walking_time_mins: 4,
+    driving_time_mins: 1
+  },
+  {
+    id: 3,
+    type: 'Hospital',
+    name: 'Hospital das Clínicas (HC)',
+    address: 'Av. Dr. Enéas Carvalho de Aguiar, 255 - Cerqueira César',
+    phone: '(11) 2661-0000',
+    latitude: -23.5567,
+    longitude: -46.6670,
+    is_24h: 1,
+    is_emergency: 1,
+    specialties: 'Alta Complexidade, Cardiologia, Neurologia',
+    distance_km: 3.50,
+    walking_time_mins: 42,
+    driving_time_mins: 7
+  }
+];
