@@ -49,11 +49,18 @@ export default function EvaluationFormPage() {
     try {
       await api.post('/evaluations', {
         region_id: 1,
+        bairro,
         public_cleanliness_rating: ratings.limpeza,
         insect_incidence_rating: ratings.insetos,
         air_quality_rating: ratings.ar,
         health_service_rating: ratings.saude,
-        feedback_text: comentarios
+        feedback_text: comentarios,
+        target_email: 'lucascristobaldasso@gmail.com'
+      });
+      // Also send direct email notification
+      await api.post('/notifications/email', {
+        type: 'evaluation',
+        data: { bairro, ratings, comentarios }
       });
       setSuccess(true);
     } catch (err: any) {
@@ -73,13 +80,17 @@ export default function EvaluationFormPage() {
       </div>
 
       {success ? (
-        <div className="card-glass" style={{ padding: '2rem', textAlign: 'center', backgroundColor: '#e6f4ea' }}>
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#34C759" strokeWidth="2" style={{ margin: '0 auto 1rem' }}>
+        <div className="card-glass" style={{ padding: '2rem', textAlign: 'center', backgroundColor: '#e6f4ea', borderRadius: '16px', border: '1px solid #34C759' }}>
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#34C759" strokeWidth="2.5" style={{ margin: '0 auto 1rem' }}>
             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
             <polyline points="22 4 12 14.01 9 11.01"></polyline>
           </svg>
-          <h3 style={{ color: '#2e7d32', marginBottom: '0.5rem' }}>Avaliação Enviada!</h3>
-          <p style={{ color: '#555', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Obrigado por ajudar a tornar São Paulo mais saudável.</p>
+          <h3 style={{ color: '#2e7d32', marginBottom: '0.5rem', fontSize: '1.4rem', fontWeight: 800 }}>Avaliação Enviada!</h3>
+          <p style={{ color: '#555', fontSize: '0.9rem', marginBottom: '0.8rem' }}>Obrigado por ajudar a tornar São Paulo mais saudável.</p>
+          <div style={{ backgroundColor: '#fff', padding: '10px', borderRadius: '10px', fontSize: '0.8rem', color: '#0047AB', fontWeight: 700, marginBottom: '1.5rem', border: '1px solid #D1E3FF' }}>
+            ✉️ Cópia do relatório enviada para: <br />
+            <strong>lucascristobaldasso@gmail.com</strong>
+          </div>
           <button 
             className="btn btn-primary" 
             onClick={() => {
@@ -89,7 +100,7 @@ export default function EvaluationFormPage() {
               setComentarios('');
               setPhotos([]);
             }}
-            style={{ backgroundColor: '#0047AB', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '8px', cursor: 'pointer' }}
+            style={{ backgroundColor: '#0047AB', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700 }}
           >
             Enviar Nova Avaliação
           </button>
