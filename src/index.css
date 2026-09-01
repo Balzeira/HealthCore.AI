@@ -521,31 +521,48 @@ p { font-size: 1rem; color: var(--text-secondary); line-height: 1.6; }
   border-top-color: rgba(11, 17, 32, 0.96) !important;
 }
 
-/* Floating GIS Map Toolbar */
-.gis-map-toolbar {
+/* Unified Responsive GIS Map Control Header */
+.gis-map-control-bar {
   position: absolute;
-  top: 16px;
-  left: 16px;
+  top: 14px;
+  left: 14px;
+  right: 14px;
   z-index: 1000;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
-  background: rgba(11, 17, 32, 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  padding: 6px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(51, 65, 85, 0.8);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.gis-map-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.gis-map-pill-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(11, 17, 32, 0.94);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  padding: 5px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(51, 65, 85, 0.85);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.65);
 }
 
 .gis-map-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: 5px;
+  padding: 5px 10px;
   border-radius: 8px;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 800;
   cursor: pointer;
   background: transparent;
@@ -553,6 +570,7 @@ p { font-size: 1rem; color: var(--text-secondary); line-height: 1.6; }
   border: 1px solid transparent;
   transition: all 0.15s ease;
   user-select: none;
+  white-space: nowrap;
 }
 
 .gis-map-btn:hover {
@@ -565,6 +583,30 @@ p { font-size: 1rem; color: var(--text-secondary); line-height: 1.6; }
   color: #FFFFFF;
   border-color: #3B82F6;
   box-shadow: 0 0 12px rgba(37, 99, 235, 0.45);
+}
+
+.gis-map-btn-action {
+  background: rgba(30, 41, 59, 0.9);
+  color: #E2E8F0;
+  border: 1px solid #334155;
+}
+
+.gis-map-btn-action:hover {
+  background: #3B82F6;
+  color: #FFFFFF;
+}
+
+/* Fullscreen Immersive Map Mode */
+.gis-map-container-fullscreen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 99999 !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 /* Pulsing animated hospital pin */

@@ -55,11 +55,28 @@ const createDarkHospitalMarkerIcon = (hospital: Hospital, isSelected: boolean, i
   });
 };
 
-const MapFlyTo = ({ center, zoom }: { center: [number, number]; zoom: number }) => {
+const MapController = ({ 
+  center, 
+  zoom, 
+  zoomTrigger 
+}: { 
+  center: [number, number]; 
+  zoom: number; 
+  zoomTrigger?: { type: 'in' | 'out' | 'recenter'; timestamp: number } | null 
+}) => {
   const map = useMap();
+
   useEffect(() => {
     map.flyTo(center, zoom, { duration: 1.0 });
   }, [center, zoom, map]);
+
+  useEffect(() => {
+    if (!zoomTrigger) return;
+    if (zoomTrigger.type === 'in') map.zoomIn();
+    if (zoomTrigger.type === 'out') map.zoomOut();
+    if (zoomTrigger.type === 'recenter') map.flyTo([-23.5505, -46.6333], 11, { duration: 1.0 });
+  }, [zoomTrigger, map]);
+
   return null;
 };
 
@@ -70,7 +87,7 @@ const ZONE_CENTERS: Record<string, { center: [number, number]; zoom: number }> =
   'Zona Sul': { center: [-23.6400, -46.6800], zoom: 11 },
   'Zona Leste': { center: [-23.5400, -46.4900], zoom: 11 },
   'Zona Norte': { center: [-23.4800, -46.6300], zoom: 12 },
-  'Todas': { center: [-23.5505, -46.6333], zoom: 12 }
+  'Todas': { center: [-23.5505, -46.6333], zoom: 11 }
 };
 
 export default function MapPage() {
@@ -84,8 +101,12 @@ export default function MapPage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [hospitalFilter, setHospitalFilter] = useState<string>('Todos');
   const [pinMode, setPinMode] = useState<'region' | 'all' | 'none'>('all');
-  const [basemap, setBasemap] = useState<'dark' | 'satellite' | 'street'>('dark');
+  const [basemap, setBasemap] = useState<'dark' | 'satellite' | 'street' | 'voyager'>('dark');
   const [mapLayerMode, setMapLayerMode] = useState<'all' | 'risk' | 'hospitals'>('all');
+  const [polygonOpacity, setPolygonOpacity] = useState<number>(0.38);
+  const [showDistrictLabels, setShowDistrictLabels] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [zoomTrigger, setZoomTrigger] = useState<{ type: 'in' | 'out' | 'recenter'; timestamp: number } | null>(null);
 
   const basemapUrls: Record<string, { url: string; attribution: string }> = {
     dark: {
@@ -94,11 +115,15 @@ export default function MapPage() {
     },
     satellite: {
       url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+      attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP'
     },
     street: {
       url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    },
+    voyager: {
+      url: 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+      attribution: '&copy; CARTO &copy; OpenStreetMap'
     }
   };
 
@@ -239,6 +264,17 @@ export default function MapPage() {
     setSelectedHospital(null);
   };
 
+  const riskCounts = useMemo(() => {
+    let alto = 0, medio = 0, baixo = 0;
+    ALL_SP_DISTRICTS.forEach(d => {
+      const r = (d.risk || '').toLowerCase();
+      if (r === 'alto') alto++;
+      else if (r === 'médio' || r === 'medio') medio++;
+      else baixo++;
+    });
+    return { alto, medio, baixo, total: ALL_SP_DISTRICTS.length };
+  }, []);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 'calc(100vh - 120px)' }}>
       
@@ -278,8 +314,8 @@ export default function MapPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#1E293B', padding: '4px 8px', borderRadius: '10px', border: '1px solid #334155' }}>
             <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#94A3B8' }}>🏥 Pins:</span>
             {[
+              { id: 'all', label: 'Todos (68)' },
               { id: 'region', label: 'Por Região' },
-              { id: 'all', label: 'Todos (56)' },
               { id: 'none', label: 'Ocultar' }
             ].map(p => (
               <button
@@ -590,97 +626,204 @@ export default function MapPage() {
         </aside>
 
         {/* Right Fluid Leaflet GIS Map View */}
-        <div style={{ position: 'relative', borderRadius: '20px', overflow: 'hidden', border: '1px solid #1E293B', boxShadow: '0 16px 40px rgba(0,0,0,0.6)' }}>
+        <div 
+          className={isFullscreen ? 'gis-map-container-fullscreen' : ''}
+          style={{ 
+            position: 'relative', 
+            borderRadius: isFullscreen ? '0' : '20px', 
+            overflow: 'hidden', 
+            border: isFullscreen ? 'none' : '1px solid #1E293B', 
+            boxShadow: '0 16px 40px rgba(0,0,0,0.6)' 
+          }}
+        >
           
-          {/* Top-Left Floating GIS Layer & Basemap Switcher Toolbar */}
-          <div className="gis-map-toolbar">
-            <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#60A5FA', textTransform: 'uppercase', marginRight: '4px' }}>
-              🗺️ Camada:
-            </span>
-            <button
-              type="button"
-              className={`gis-map-btn ${basemap === 'dark' ? 'active' : ''}`}
-              onClick={() => setBasemap('dark')}
-              title="Visualização Dark Obsidian"
-            >
-              🌙 Dark
-            </button>
-            <button
-              type="button"
-              className={`gis-map-btn ${basemap === 'satellite' ? 'active' : ''}`}
-              onClick={() => setBasemap('satellite')}
-              title="Visualização Satélite HD"
-            >
-              🛰️ Satélite
-            </button>
-            <button
-              type="button"
-              className={`gis-map-btn ${basemap === 'street' ? 'active' : ''}`}
-              onClick={() => setBasemap('street')}
-              title="Visualização Ruas & Topografia"
-            >
-              🏙️ Ruas
-            </button>
+          {/* Unified Responsive GIS Map Control Header */}
+          <div className="gis-map-control-bar">
+            
+            {/* Top Line: Basemaps & Custom Visual Settings */}
+            <div className="gis-map-row">
+              {/* Basemap Switcher */}
+              <div className="gis-map-pill-group">
+                <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#60A5FA', textTransform: 'uppercase', marginRight: '2px' }}>
+                  🗺️ Mapa:
+                </span>
+                {[
+                  { id: 'dark', label: '🌙 Dark' },
+                  { id: 'satellite', label: '🛰️ Satélite' },
+                  { id: 'street', label: '🏙️ Ruas' },
+                  { id: 'voyager', label: '🪐 Noturno' }
+                ].map(b => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    className={`gis-map-btn ${basemap === b.id ? 'active' : ''}`}
+                    onClick={() => setBasemap(b.id as any)}
+                  >
+                    {b.label}
+                  </button>
+                ))}
+              </div>
 
-            <div style={{ width: '1px', height: '18px', backgroundColor: '#334155', margin: '0 4px' }}></div>
+              {/* Visual Controls: Opacity & Labels */}
+              <div className="gis-map-pill-group">
+                <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#94A3B8', textTransform: 'uppercase', marginRight: '2px' }}>
+                  🎨 Opacidade:
+                </span>
+                {[
+                  { val: 0.18, label: '20%' },
+                  { val: 0.38, label: '40%' },
+                  { val: 0.70, label: '70%' }
+                ].map(op => (
+                  <button
+                    key={op.val}
+                    type="button"
+                    className={`gis-map-btn ${polygonOpacity === op.val ? 'active' : ''}`}
+                    onClick={() => setPolygonOpacity(op.val)}
+                  >
+                    {op.label}
+                  </button>
+                ))}
 
-            <button
-              type="button"
-              className={`gis-map-btn ${mapLayerMode === 'all' ? 'active' : ''}`}
-              onClick={() => setMapLayerMode('all')}
-              title="Exibir Zonas de Risco e Hospitais"
-            >
-              🌐 Completo
-            </button>
-            <button
-              type="button"
-              className={`gis-map-btn ${mapLayerMode === 'risk' ? 'active' : ''}`}
-              onClick={() => setMapLayerMode('risk')}
-              title="Apenas Zonas de Risco"
-            >
-              🌡️ Risco
-            </button>
-            <button
-              type="button"
-              className={`gis-map-btn ${mapLayerMode === 'hospitals' ? 'active' : ''}`}
-              onClick={() => setMapLayerMode('hospitals')}
-              title="Apenas Hospitais"
-            >
-              🏥 Hospitais
-            </button>
-          </div>
+                <div style={{ width: '1px', height: '14px', backgroundColor: '#334155', margin: '0 2px' }}></div>
 
-          {/* Top-Right Map Status Floating Legend */}
-          <div style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 1000, backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', padding: '10px 18px', borderRadius: '14px', border: '1px solid #334155', display: 'flex', gap: '14px', fontSize: '0.85rem', fontWeight: 800, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
-            <span style={{ color: '#EF4444', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#EF4444', display: 'inline-block' }}></span>
-              Risco Alto
-            </span>
-            <span style={{ color: '#F59E0B', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#F59E0B', display: 'inline-block' }}></span>
-              Risco Médio
-            </span>
-            <span style={{ color: '#10B981', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10B981', display: 'inline-block' }}></span>
-              Risco Baixo
-            </span>
+                <button
+                  type="button"
+                  className={`gis-map-btn ${showDistrictLabels ? 'active' : ''}`}
+                  onClick={() => setShowDistrictLabels(!showDistrictLabels)}
+                  title="Fixar nomes dos bairros nos polígonos"
+                >
+                  🏷️ Nomes {showDistrictLabels ? 'ON' : 'OFF'}
+                </button>
+
+                <button
+                  type="button"
+                  className={`gis-map-btn ${isFullscreen ? 'active' : ''}`}
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  title="Expandir em Tela Cheia"
+                >
+                  {isFullscreen ? '⛶ Sair' : '⛶ Tela Cheia'}
+                </button>
+              </div>
+            </div>
+
+            {/* Bottom Line: Layers, Interactive Legend / Risk Filter & Zoom Actions */}
+            <div className="gis-map-row">
+              {/* Layer Modes */}
+              <div className="gis-map-pill-group">
+                <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#60A5FA', textTransform: 'uppercase', marginRight: '2px' }}>
+                  👁️ Camada:
+                </span>
+                {[
+                  { id: 'all', label: '🌐 Completo' },
+                  { id: 'risk', label: '🌡️ Risco' },
+                  { id: 'hospitals', label: '🏥 Hospitais' }
+                ].map(l => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    className={`gis-map-btn ${mapLayerMode === l.id ? 'active' : ''}`}
+                    onClick={() => setMapLayerMode(l.id as any)}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Interactive Legend / Quick Risk Isolation */}
+              <div className="gis-map-pill-group">
+                <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#94A3B8', textTransform: 'uppercase', marginRight: '2px' }}>
+                  Filtrar:
+                </span>
+                <button
+                  type="button"
+                  className={`gis-map-btn ${filterRisk === 'Alto' ? 'active' : ''}`}
+                  onClick={() => setFilterRisk(filterRisk === 'Alto' ? 'Todos' : 'Alto')}
+                  style={{ color: filterRisk === 'Alto' ? '#FFF' : '#EF4444' }}
+                >
+                  ● Alto ({riskCounts.alto})
+                </button>
+                <button
+                  type="button"
+                  className={`gis-map-btn ${filterRisk === 'Médio' ? 'active' : ''}`}
+                  onClick={() => setFilterRisk(filterRisk === 'Médio' ? 'Todos' : 'Médio')}
+                  style={{ color: filterRisk === 'Médio' ? '#FFF' : '#F59E0B' }}
+                >
+                  ● Médio ({riskCounts.medio})
+                </button>
+                <button
+                  type="button"
+                  className={`gis-map-btn ${filterRisk === 'Baixo' ? 'active' : ''}`}
+                  onClick={() => setFilterRisk(filterRisk === 'Baixo' ? 'Todos' : 'Baixo')}
+                  style={{ color: filterRisk === 'Baixo' ? '#FFF' : '#10B981' }}
+                >
+                  ● Baixo ({riskCounts.baixo})
+                </button>
+                {filterRisk !== 'Todos' && (
+                  <button
+                    type="button"
+                    className="gis-map-btn"
+                    onClick={() => setFilterRisk('Todos')}
+                    style={{ color: '#60A5FA' }}
+                  >
+                    ✕ Todos
+                  </button>
+                )}
+              </div>
+
+              {/* Zoom & SP Recenter Controls */}
+              <div className="gis-map-pill-group">
+                <button
+                  type="button"
+                  className="gis-map-btn gis-map-btn-action"
+                  onClick={() => setZoomTrigger({ type: 'in', timestamp: Date.now() })}
+                  title="Aproximar Zoom (+)"
+                >
+                  ➕
+                </button>
+                <button
+                  type="button"
+                  className="gis-map-btn gis-map-btn-action"
+                  onClick={() => setZoomTrigger({ type: 'out', timestamp: Date.now() })}
+                  title="Afastar Zoom (-)"
+                >
+                  ➖
+                </button>
+                <button
+                  type="button"
+                  className="gis-map-btn gis-map-btn-action"
+                  onClick={() => {
+                    handleRecenterSP();
+                    setZoomTrigger({ type: 'recenter', timestamp: Date.now() });
+                  }}
+                  title="Centralizar São Paulo"
+                >
+                  🎯 SP Geral
+                </button>
+              </div>
+
+            </div>
+
           </div>
 
           <MapContainer
             center={mapCenter}
             zoom={mapZoom}
-            style={{ height: '100%', width: '100%', minHeight: '680px', backgroundColor: '#070B14' }}
+            style={{ height: '100%', width: '100%', minHeight: isFullscreen ? '100vh' : '720px', backgroundColor: '#070B14' }}
             zoomControl={false}
           >
-            {/* Dynamic Basemap Tile Layer (Dark Obsidian, Satellite HD, Street) */}
+            {/* Dynamic Basemap Tile Layer (Dark Obsidian, Satellite HD, Street, Voyager) */}
             <TileLayer
               key={basemap}
               url={basemapUrls[basemap].url}
               attribution={basemapUrls[basemap].attribution}
             />
-            <MapFlyTo center={mapCenter} zoom={mapZoom} />
+            <MapController 
+              center={mapCenter} 
+              zoom={mapZoom} 
+              zoomTrigger={zoomTrigger} 
+            />
 
-            {/* Clean Modern Risk Polygons with Smooth Glassmorphism Fills */}
+            {/* Clean Modern Risk Polygons with Configurable Opacity & Labels */}
             {(mapLayerMode === 'all' || mapLayerMode === 'risk') && filteredDistricts.map(district => {
               const isSelected = selectedDistrict.id === district.id;
               const riskColor = getRiskColor(district.risk);
@@ -692,7 +835,7 @@ export default function MapPage() {
                   pathOptions={{
                     color: isSelected ? '#38BDF8' : riskColor,
                     fillColor: riskColor,
-                    fillOpacity: isSelected ? 0.65 : 0.38,
+                    fillOpacity: isSelected ? Math.min(1, polygonOpacity + 0.3) : polygonOpacity,
                     weight: isSelected ? 4 : 2,
                     dashArray: isSelected ? undefined : '2, 2'
                   }}
@@ -700,9 +843,9 @@ export default function MapPage() {
                     click: () => handleSelectDistrict(district)
                   }}
                 >
-                  <Tooltip direction="center" permanent={false} className="custom-district-tooltip">
+                  <Tooltip direction="center" permanent={showDistrictLabels} className="custom-district-tooltip">
                     <div style={{ padding: '4px 6px' }}>
-                      <div style={{ fontSize: '14px', fontWeight: 900, color: '#FFFFFF' }}>{district.name}</div>
+                      <div style={{ fontSize: '13px', fontWeight: 900, color: '#FFFFFF' }}>{district.name}</div>
                       <div style={{ color: '#94A3B8', fontSize: '11px', marginTop: '2px' }}>{district.zone} • Subprefeitura {district.subprefeitura}</div>
                       <div style={{ color: riskColor, fontSize: '12px', fontWeight: 800, marginTop: '4px' }}>
                         ● Nível de Risco {district.risk} ({district.cases} casos)
