@@ -1,324 +1,759 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api/client';
 import L from 'leaflet';
-import { MapContainer, TileLayer, Circle, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import { api } from '../api/client';
 
-// Fix leaflet default icons
+import { ALL_SP_DISTRICTS, SPDistrictRegion } from '../data/spBoundaries';
+import { ALL_SP_HOSPITALS, Hospital } from '../data/hospitalsData';
+
+// Leaflet default icons fix
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 let DefaultIcon = L.icon({
   iconUrl: icon,
   shadowUrl: iconShadow,
-  iconSize: [20, 32],
-  iconAnchor: [10, 32],
-  popupAnchor: [0, -28],
-  shadowSize: [32, 32]
+  iconSize: [22, 36],
+  iconAnchor: [11, 36],
+  popupAnchor: [0, -32],
+  shadowSize: [36, 36]
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
-// Clean minimal divIcon badge for neighborhood pinpoint
-const createMinimalPinIcon = (name: string, risk: string) => {
-  const isHigh = risk.toLowerCase() === 'alto';
-  const isMed = risk.toLowerCase() === 'médio' || risk.toLowerCase() === 'medio';
-  const color = isHigh ? '#FF3B30' : isMed ? '#F5A623' : '#34C759';
+// Custom Dark Pin Icon with distinction for district-selected vs general
+const createDarkHospitalMarkerIcon = (hospital: Hospital, isSelected: boolean, isDistrictHospital: boolean) => {
+  const isEmergency = hospital?.is_emergency;
+  const isPublic = hospital?.is_public;
+  const bg = isEmergency ? '#EF4444' : isPublic ? '#3B82F6' : '#A855F7';
+  const size = isSelected ? 42 : isDistrictHospital ? 34 : 26;
 
   return L.divIcon({
-    className: 'minimal-district-pin',
+    className: 'hospital-dark-pin',
     html: `
       <div style="
-        background: ${color};
+        background: ${bg};
         color: white;
-        padding: 3px 8px;
-        border-radius: 12px;
-        font-weight: 700;
-        font-size: 10px;
-        font-family: Inter, sans-serif;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-        border: 1.5px solid #FFFFFF;
-        white-space: nowrap;
+        width: ${size}px;
+        height: ${size}px;
+        border-radius: 50%;
         display: flex;
         align-items: center;
-        gap: 4px;
+        justify-content: center;
+        font-size: ${size > 34 ? '18px' : size > 28 ? '15px' : '12px'};
+        box-shadow: ${isSelected ? `0 0 24px #FFFFFF, 0 0 16px ${bg}` : isDistrictHospital ? `0 0 16px ${bg}` : '0 2px 8px rgba(0,0,0,0.5)'};
+        border: ${isSelected ? '3px solid #FFFFFF' : isDistrictHospital ? '2px solid #FFFFFF' : '1.5px solid rgba(255,255,255,0.6)'};
         cursor: pointer;
-        transform: translate(-50%, -50%);
+        transition: transform 0.2s ease;
+        opacity: ${isDistrictHospital || isSelected ? 1 : 0.75};
       ">
-        <span style="width: 5px; height: 5px; background: #FFFFFF; border-radius: 50%; display: inline-block;"></span>
-        ${name}
+        🏥
       </div>
     `,
-    iconSize: [80, 22],
-    iconAnchor: [40, 11]
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2]
   });
 };
 
-const FlyToRegion = ({ center, zoom }: { center: [number, number] | null; zoom: number }) => {
+const MapFlyTo = ({ center, zoom }: { center: [number, number]; zoom: number }) => {
   const map = useMap();
   useEffect(() => {
-    if (center) {
-      map.flyTo(center, zoom, { duration: 1.0 });
-    }
+    map.flyTo(center, zoom, { duration: 1.0 });
   }, [center, zoom, map]);
   return null;
 };
 
-// All 32 Districts of São Paulo grouped by zone with health risk level color mapping
-const ALL_SP_DISTRICTS = [
-  // Centro
-  { id: 1, name: 'Sé', zone: 'Centro', lat: -23.5505, lng: -46.6333, risk: 'Alto', aqi: 120, cases: 605, disease: 'Dengue & Influenza', cleanliness: 2.1, air: 2.0 },
-  { id: 2, name: 'República', zone: 'Centro', lat: -23.5434, lng: -46.6425, risk: 'Alto', aqi: 115, cases: 390, disease: 'Dengue & Tuberculose', cleanliness: 2.3, air: 2.2 },
-  { id: 3, name: 'Bela Vista', zone: 'Centro', lat: -23.5574, lng: -46.6437, risk: 'Médio', aqi: 78, cases: 430, disease: 'Gripe (Influenza)', cleanliness: 3.5, air: 3.2 },
-  { id: 4, name: 'Liberdade', zone: 'Centro', lat: -23.5677, lng: -46.6368, risk: 'Médio', aqi: 68, cases: 210, disease: 'Influenza Moderada', cleanliness: 3.8, air: 3.5 },
-  { id: 5, name: 'Consolação', zone: 'Centro', lat: -23.5501, lng: -46.6575, risk: 'Médio', aqi: 72, cases: 180, disease: 'Vigilância Ativa', cleanliness: 4.0, air: 3.6 },
-  { id: 6, name: 'Santa Cecília', zone: 'Centro', lat: -23.5385, lng: -46.6504, risk: 'Médio', aqi: 82, cases: 195, disease: 'Leptospirose', cleanliness: 3.2, air: 3.1 },
-  { id: 7, name: 'Bom Retiro', zone: 'Centro', lat: -23.5278, lng: -46.6389, risk: 'Alto', aqi: 105, cases: 320, disease: 'Dengue Surto Local', cleanliness: 2.5, air: 2.8 },
-
-  // Zona Oeste
-  { id: 8, name: 'Pinheiros', zone: 'Zona Oeste', lat: -23.5615, lng: -46.6974, risk: 'Baixo', aqi: 45, cases: 95, disease: 'Baixa Incidência', cleanliness: 4.7, air: 4.5 },
-  { id: 9, name: 'Vila Madalena', zone: 'Zona Oeste', lat: -23.5539, lng: -46.6917, risk: 'Baixo', aqi: 42, cases: 50, disease: 'Baixa Incidência', cleanliness: 4.8, air: 4.6 },
-  { id: 10, name: 'Perdizes', zone: 'Zona Oeste', lat: -23.5356, lng: -46.6742, risk: 'Baixo', aqi: 48, cases: 70, disease: 'Excelente Controle', cleanliness: 4.6, air: 4.4 },
-  { id: 11, name: 'Lapa', zone: 'Zona Oeste', lat: -23.5222, lng: -46.7028, risk: 'Baixo', aqi: 52, cases: 110, disease: 'Risco Controlado', cleanliness: 4.3, air: 4.2 },
-  { id: 12, name: 'Butantã', zone: 'Zona Oeste', lat: -23.5719, lng: -46.7081, risk: 'Baixo', aqi: 40, cases: 65, disease: 'Área Arborizada', cleanliness: 4.7, air: 4.7 },
-  { id: 13, name: 'Jardins', zone: 'Zona Oeste', lat: -23.5628, lng: -46.6667, risk: 'Baixo', aqi: 44, cases: 55, disease: 'Baixa Incidência', cleanliness: 4.8, air: 4.5 },
-
-  // Zona Leste
-  { id: 14, name: 'Itaquera', zone: 'Zona Leste', lat: -23.5367, lng: -46.4601, risk: 'Alto', aqi: 110, cases: 510, disease: 'Dengue & Respiratórias', cleanliness: 2.4, air: 2.7 },
-  { id: 15, name: 'Tatuapé', zone: 'Zona Leste', lat: -23.5403, lng: -46.5764, risk: 'Médio', aqi: 75, cases: 230, disease: 'Dengue Moderada', cleanliness: 3.9, air: 3.6 },
-  { id: 16, name: 'Mooca', zone: 'Zona Leste', lat: -23.5606, lng: -46.5983, risk: 'Médio', aqi: 80, cases: 280, disease: 'Respiratórias', cleanliness: 3.7, air: 3.4 },
-  { id: 17, name: 'Penha', zone: 'Zona Leste', lat: -23.5264, lng: -46.5458, risk: 'Alto', aqi: 98, cases: 410, disease: 'Dengue & Influenza', cleanliness: 2.8, air: 3.0 },
-  { id: 18, name: 'São Mateus', zone: 'Zona Leste', lat: -23.6128, lng: -46.4714, risk: 'Alto', aqi: 118, cases: 580, disease: 'Dengue Surto Leste', cleanliness: 2.2, air: 2.5 },
-  { id: 19, name: 'Vila Prudente', zone: 'Zona Leste', lat: -23.5828, lng: -46.5819, risk: 'Médio', aqi: 76, cases: 205, disease: 'Gripe Sazonal', cleanliness: 3.6, air: 3.5 },
-
-  // Zona Sul
-  { id: 20, name: 'Vila Mariana', zone: 'Zona Sul', lat: -23.5898, lng: -46.6341, risk: 'Baixo', aqi: 42, cases: 60, disease: 'Qualidade Ar Ótima', cleanliness: 4.7, air: 4.6 },
-  { id: 21, name: 'Moema', zone: 'Zona Sul', lat: -23.6006, lng: -46.6631, risk: 'Baixo', aqi: 38, cases: 12, disease: 'Risco Controlado', cleanliness: 4.9, air: 4.8 },
-  { id: 22, name: 'Itaim Bibi', zone: 'Zona Sul', lat: -23.5839, lng: -46.6789, risk: 'Baixo', aqi: 41, cases: 30, disease: 'Excelente Controle', cleanliness: 4.9, air: 4.7 },
-  { id: 23, name: 'Santo Amaro', zone: 'Zona Sul', lat: -23.6528, lng: -46.7083, risk: 'Médio', aqi: 74, cases: 310, disease: 'Influenza Sazonal', cleanliness: 3.8, air: 3.6 },
-  { id: 24, name: 'Jabaquara', zone: 'Zona Sul', lat: -23.6467, lng: -46.6417, risk: 'Médio', aqi: 85, cases: 290, disease: 'Dengue Moderada', cleanliness: 3.3, air: 3.2 },
-  { id: 25, name: 'Grajaú', zone: 'Zona Sul', lat: -23.7744, lng: -46.6961, risk: 'Alto', aqi: 125, cases: 640, disease: 'Dengue & Leptospirose', cleanliness: 2.1, air: 2.3 },
-  { id: 26, name: 'Campo Limpo', zone: 'Zona Sul', lat: -23.6339, lng: -46.7583, risk: 'Alto', aqi: 112, cases: 530, disease: 'Respiratórias & Dengue', cleanliness: 2.4, air: 2.6 },
-
-  // Zona Norte
-  { id: 27, name: 'Santana', zone: 'Zona Norte', lat: -23.5042, lng: -46.6267, risk: 'Baixo', aqi: 49, cases: 85, disease: 'Risco Controlado', cleanliness: 4.4, air: 4.3 },
-  { id: 28, name: 'Tucuruvi', zone: 'Zona Norte', lat: -23.4792, lng: -46.6028, risk: 'Baixo', aqi: 46, cases: 72, disease: 'Baixa Incidência', cleanliness: 4.5, air: 4.5 },
-  { id: 29, name: 'Vila Guilherme', zone: 'Zona Norte', lat: -23.5139, lng: -46.6083, risk: 'Médio', aqi: 71, cases: 165, disease: 'Gripe Sazonal', cleanliness: 3.7, air: 3.6 },
-  { id: 30, name: 'Casa Verde', zone: 'Zona Norte', lat: -23.5044, lng: -46.6578, risk: 'Médio', aqi: 73, cases: 190, disease: 'Influenza Sazonal', cleanliness: 3.8, air: 3.7 },
-  { id: 31, name: 'Freguesia do Ó', zone: 'Zona Norte', lat: -23.4931, lng: -46.6972, risk: 'Médio', aqi: 79, cases: 220, disease: 'Dengue Moderada', cleanliness: 3.5, air: 3.4 },
-  { id: 32, name: 'Brasilândia', zone: 'Zona Norte', lat: -23.4639, lng: -46.6875, risk: 'Alto', aqi: 116, cases: 590, disease: 'Dengue Surto Norte', cleanliness: 2.2, air: 2.5 }
-];
+// Center positions for macro zones
+const ZONE_CENTERS: Record<string, { center: [number, number]; zoom: number }> = {
+  'Centro': { center: [-23.5505, -46.6333], zoom: 13 },
+  'Zona Oeste': { center: [-23.5580, -46.7050], zoom: 12 },
+  'Zona Sul': { center: [-23.6400, -46.6800], zoom: 11 },
+  'Zona Leste': { center: [-23.5400, -46.4900], zoom: 11 },
+  'Zona Norte': { center: [-23.4800, -46.6300], zoom: 12 },
+  'Todas': { center: [-23.5505, -46.6333], zoom: 12 }
+};
 
 export default function MapPage() {
   const navigate = useNavigate();
-  const [selectedDistrict, setSelectedDistrict] = useState<any>(null);
+  const [selectedDistrict, setSelectedDistrict] = useState<SPDistrictRegion>(ALL_SP_DISTRICTS[0]); // Sé default
+  const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>([-23.5505, -46.6333]);
+  const [mapZoom, setMapZoom] = useState<number>(11);
   const [filterZone, setFilterZone] = useState<string>('Todas');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showDrawer, setShowDrawer] = useState(false);
+  const [filterRisk, setFilterRisk] = useState<string>('Todos');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [hospitalFilter, setHospitalFilter] = useState<string>('Todos');
+  const [pinMode, setPinMode] = useState<'region' | 'all' | 'none'>('all');
+  const [basemap, setBasemap] = useState<'dark' | 'satellite' | 'street'>('dark');
+  const [mapLayerMode, setMapLayerMode] = useState<'all' | 'risk' | 'hospitals'>('all');
 
-  const getRiskColor = (risk: string) => {
-    const r = risk ? risk.toLowerCase() : '';
-    if (r === 'alto') return '#FF3B30';
-    if (r === 'médio' || r === 'medio') return '#F5A623';
-    return '#34C759';
+  const basemapUrls: Record<string, { url: string; attribution: string }> = {
+    dark: {
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+      attribution: '&copy; Esri &mdash; Esri, DeLorme, NAVTEQ, OpenStreetMap'
+    },
+    satellite: {
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    },
+    street: {
+      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }
   };
 
-  const filteredDistricts = ALL_SP_DISTRICTS.filter(d => {
-    const matchesZone = filterZone === 'Todas' || d.zone.toLowerCase() === filterZone.toLowerCase();
-    const matchesSearch = d.name.toLowerCase().includes(searchQuery.toLowerCase()) || d.zone.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesZone && matchesSearch;
-  });
+  // Real SUS & Temporal Analysis State
+  const [selectedYear, setSelectedYear] = useState<string>('Todos');
+  const [temporalSummary, setTemporalSummary] = useState<any>(null);
 
-  const handleSelectDistrict = (d: any) => {
+  useEffect(() => {
+    loadTemporalSummary();
+  }, [selectedYear]);
+
+  const loadTemporalSummary = async () => {
+    try {
+      let q = '';
+      if (selectedYear === '2025') q = '?start_date=2025-01-01&end_date=2025-12-31';
+      if (selectedYear === '2026') q = '?start_date=2026-01-01&end_date=2026-12-31';
+      const data = await api.get(`/stats/temporal-analysis${q}`);
+      setTemporalSummary(data);
+    } catch (err) {
+      console.warn('Temporal summary map load fallback:', err);
+    }
+  };
+
+  const getRiskColor = (risk: string) => {
+    const r = (risk || '').toLowerCase();
+    if (r === 'alto') return '#EF4444';
+    if (r === 'médio' || r === 'medio') return '#F59E0B';
+    return '#10B981';
+  };
+
+  // Filter districts safely
+  const filteredDistricts = useMemo(() => {
+    return ALL_SP_DISTRICTS.filter(d => {
+      const dZone = (d?.zone || '').toLowerCase();
+      const dRisk = (d?.risk || '').toLowerCase();
+      const dName = (d?.name || '').toLowerCase();
+      const dSub = (d?.subprefeitura || '').toLowerCase();
+      const q = (searchQuery || '').toLowerCase();
+
+      const matchesZone = filterZone === 'Todas' || dZone === filterZone.toLowerCase();
+      const matchesRisk = filterRisk === 'Todos' || dRisk === filterRisk.toLowerCase();
+      const matchesSearch = q === '' || dName.includes(q) || dSub.includes(q);
+      return matchesZone && matchesRisk && matchesSearch;
+    });
+  }, [filterZone, filterRisk, searchQuery]);
+
+  const [hudScope, setHudScope] = useState<'zone' | 'district'>('zone');
+
+  // HUD Hospitals calculation:
+  // When hudScope === 'district', shows hospitals in selectedDistrict.
+  // When hudScope === 'zone', shows all hospitals in filterZone.
+  const hudHospitals = useMemo(() => {
+    let list: Hospital[] = [];
+    if (hudScope === 'district' && selectedDistrict?.hospitalIds) {
+      list = ALL_SP_HOSPITALS.filter(h => selectedDistrict.hospitalIds.includes(h.id));
+    } else {
+      const targetZone = filterZone.trim().toLowerCase();
+      list = ALL_SP_HOSPITALS.filter(h => {
+        if (targetZone === 'todas') return true;
+        return (h?.zone || '').trim().toLowerCase() === targetZone;
+      });
+    }
+
+    return list.filter(h => {
+      if (hospitalFilter === '24h') return Boolean(h?.is_24h);
+      if (hospitalFilter === 'Emergência') return Boolean(h?.is_emergency);
+      if (hospitalFilter === 'SUS') return h?.network === 'SUS';
+      if (hospitalFilter === 'Privado') return h?.network === 'Privado';
+      if (hospitalFilter === 'Filantrópico') return h?.network === 'Filantrópico';
+      return true;
+    });
+  }, [hudScope, selectedDistrict, filterZone, hospitalFilter]);
+
+  // Map Pins: Smart filtering based on pinMode and filterZone
+  const mapVisibleHospitals = useMemo(() => {
+    if (pinMode === 'none') return [];
+
+    let base = ALL_SP_HOSPITALS;
+
+    if (pinMode === 'region') {
+      if (filterZone !== 'Todas') {
+        base = ALL_SP_HOSPITALS.filter(h => (h?.zone || '').trim().toLowerCase() === filterZone.trim().toLowerCase());
+      } else {
+        // In SP Overview with region mode, show key reference hospitals to prevent dense clutter
+        base = ALL_SP_HOSPITALS.filter(h => [101, 102, 201, 204, 301, 306, 401, 405, 501, 510].includes(h.id));
+      }
+    } else if (pinMode === 'all') {
+      if (filterZone !== 'Todas') {
+        base = ALL_SP_HOSPITALS.filter(h => (h?.zone || '').trim().toLowerCase() === filterZone.trim().toLowerCase());
+      }
+    }
+
+    return base.filter(h => {
+      if (hospitalFilter === '24h') return Boolean(h?.is_24h);
+      if (hospitalFilter === 'Emergência') return Boolean(h?.is_emergency);
+      if (hospitalFilter === 'SUS') return h?.network === 'SUS';
+      if (hospitalFilter === 'Privado') return h?.network === 'Privado';
+      if (hospitalFilter === 'Filantrópico') return h?.network === 'Filantrópico';
+      return true;
+    });
+  }, [pinMode, filterZone, hospitalFilter]);
+
+  const handleSelectDistrict = (d: SPDistrictRegion) => {
     setSelectedDistrict(d);
-    setMapCenter([d.lat, d.lng]);
-    setShowDrawer(true);
+    setSelectedHospital(null);
+    setHudScope('district');
+    setFilterZone(d.zone);
+    setMapCenter(d.center);
+    setMapZoom(14);
+  };
+
+  const handleSelectZoneFilter = (z: string) => {
+    setFilterZone(z);
+    setSelectedHospital(null);
+    setHudScope('zone');
+
+    if (z !== 'Todas') {
+      const firstDistrictInZone = ALL_SP_DISTRICTS.find(d => d.zone.toLowerCase() === z.toLowerCase());
+      if (firstDistrictInZone) {
+        setSelectedDistrict(firstDistrictInZone);
+      }
+    }
+
+    if (ZONE_CENTERS[z]) {
+      setMapCenter(ZONE_CENTERS[z].center);
+      setMapZoom(ZONE_CENTERS[z].zoom);
+    }
+  };
+
+  const handleRecenterSP = () => {
+    setMapCenter([-23.5505, -46.6333]);
+    setMapZoom(12);
+    setFilterZone('Todas');
+    setFilterRisk('Todos');
+    setSearchQuery('');
+    setHudScope('zone');
+    setSelectedDistrict(ALL_SP_DISTRICTS[0]);
+    setSelectedHospital(null);
   };
 
   return (
-    <div style={{ position: 'relative', height: '100vh', width: '100%', maxWidth: '430px', margin: '0 auto', fontFamily: 'Inter, sans-serif', overflow: 'hidden', backgroundColor: '#F8FAFC' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 'calc(100vh - 120px)' }}>
       
-      {/* Clean Floating Top Header */}
-      <div style={{ position: 'absolute', top: '14px', left: '12px', right: '12px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <button 
-            onClick={() => navigate(-1)} 
-            style={{ width: '42px', height: '42px', backgroundColor: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(10px)', border: '1px solid #E2E8F0', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0F172A', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-          </button>
-
-          {/* Minimal Search Input */}
-          <div style={{ flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(10px)', border: '1px solid #E2E8F0', borderRadius: '12px', display: 'flex', alignItems: 'center', padding: '0 12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input 
-              type="text" 
-              placeholder="Buscar bairro (32 distritos SP)..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ flex: 1, backgroundColor: 'transparent', border: 'none', color: '#0F172A', padding: '10px 8px', outline: 'none', fontSize: '12px', fontWeight: 600 }} 
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', fontSize: '13px' }}>✕</button>
-            )}
-          </div>
+      {/* Top Header Controls Bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', backgroundColor: '#0F172A', padding: '16px 24px', borderRadius: '16px', border: '1px solid #1E293B' }}>
+        <div>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#FFFFFF', margin: 0, letterSpacing: '-0.5px' }}>
+            Mapa Geográfico de São Paulo Capital
+          </h1>
+          <p style={{ fontSize: '0.95rem', color: '#94A3B8', margin: '2px 0 0' }}>
+            Visualização GIS interativa das 32 subprefeituras, indicadores sanitários do SUS e rede hospitalar da capital.
+          </p>
         </div>
 
-        {/* Minimal Zone Filter Pills */}
-        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px', scrollbarWidth: 'none' }}>
-          {['Todas', 'Centro', 'Zona Oeste', 'Zona Leste', 'Zona Sul', 'Zona Norte'].map(zone => (
-            <button
-              key={zone}
-              onClick={() => setFilterZone(zone)}
-              style={{
-                padding: '5px 10px', borderRadius: '16px', fontSize: '11px', fontWeight: 700, border: 'none',
-                backgroundColor: filterZone === zone ? '#0047AB' : 'rgba(255,255,255,0.92)',
-                color: filterZone === zone ? '#FFFFFF' : '#475569', cursor: 'pointer', backdropFilter: 'blur(8px)',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.05)', whiteSpace: 'nowrap', transition: 'all 0.2s ease'
-              }}
-            >
-              {zone}
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Period Filter Pill */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#1E293B', padding: '4px 8px', borderRadius: '10px', border: '1px solid #334155' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#94A3B8' }}>Período:</span>
+            {['Todos', '2025', '2026'].map(y => (
+              <button
+                key={y}
+                type="button"
+                onClick={() => setSelectedYear(y)}
+                style={{
+                  padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer',
+                  backgroundColor: selectedYear === y ? '#3B82F6' : 'transparent',
+                  color: selectedYear === y ? '#FFF' : '#94A3B8',
+                  border: 'none'
+                }}
+              >
+                {y}
+              </button>
+            ))}
+          </div>
+
+          {/* Pin Mode Control */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#1E293B', padding: '4px 8px', borderRadius: '10px', border: '1px solid #334155' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#94A3B8' }}>🏥 Pins:</span>
+            {[
+              { id: 'region', label: 'Por Região' },
+              { id: 'all', label: 'Todos (56)' },
+              { id: 'none', label: 'Ocultar' }
+            ].map(p => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setPinMode(p.id as any)}
+                style={{
+                  padding: '6px 10px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer',
+                  backgroundColor: pinMode === p.id ? '#3B82F6' : 'transparent',
+                  color: pinMode === p.id ? '#FFF' : '#94A3B8',
+                  border: 'none'
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleRecenterSP}
+            className="btn-secondary"
+            style={{ fontSize: '0.9rem', padding: '10px 18px' }}
+          >
+            🎯 Visão Geral SP
+          </button>
         </div>
       </div>
 
-      {/* Clean Interactive Leaflet Map showing ALL 32 Districts with Color Fills */}
-      <MapContainer 
-        center={[-23.5505, -46.6333]} 
-        zoom={12} 
-        style={{ height: '100%', width: '100%', backgroundColor: '#F1F5F9' }}
-        zoomControl={false}
-      >
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap'
-        />
-        <FlyToRegion center={mapCenter} zoom={13} />
+      {/* Main Map + HUD 2-Column Split View */}
+      <div style={{ display: 'grid', gridTemplateColumns: '440px 1fr', gap: '20px', minHeight: '680px' }}>
+        
+        {/* Left Dark HUD Sidebar */}
+        <aside className="hud-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxHeight: '740px', overflowY: 'auto' }}>
+          
+          {/* Zone Filter Buttons with Active Badges */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#60A5FA', textTransform: 'uppercase' }}>
+                📍 Região de SP
+              </span>
+              <span style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 700 }}>
+                {filterZone}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', flexWrap: 'wrap' }}>
+              {['Todas', 'Centro', 'Zona Oeste', 'Zona Sul', 'Zona Leste', 'Zona Norte'].map(z => {
+                const isActive = filterZone === z;
+                return (
+                  <button
+                    key={z}
+                    type="button"
+                    onClick={() => handleSelectZoneFilter(z)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 12px',
+                      borderRadius: '10px',
+                      fontSize: '0.85rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      border: isActive ? '2px solid #3B82F6' : '1px solid #334155',
+                      backgroundColor: isActive ? '#1D4ED8' : '#1E293B',
+                      color: isActive ? '#FFFFFF' : '#CBD5E1',
+                      boxShadow: isActive ? '0 0 12px rgba(59, 130, 246, 0.5)' : 'none',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <span>{isActive ? '✓ ' : ''}{z}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-        {/* Render smooth colored area circle for EVERY district of São Paulo */}
-        {filteredDistricts.map((d) => {
-          const color = getRiskColor(d.risk);
-          const isSelected = selectedDistrict?.id === d.id;
+          {/* Selected Region Detailed Card */}
+          <div style={{ backgroundColor: '#070B14', borderRadius: '16px', padding: '20px', border: `2px solid ${getRiskColor(selectedDistrict.risk)}50` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#60A5FA', textTransform: 'uppercase' }}>
+                {selectedDistrict.zone} • {selectedDistrict.subprefeitura}
+              </span>
+              <span className={`badge-risk badge-risk-${(selectedDistrict.risk || 'baixo').toLowerCase().replace('é', 'e')}`}>
+                ● Risco {selectedDistrict.risk}
+              </span>
+            </div>
 
-          return (
-            <React.Fragment key={d.id}>
-              {/* Colored district health zone area coverage */}
-              <Circle 
-                center={[d.lat, d.lng]} 
-                radius={1300} 
-                pathOptions={{ 
-                  color: color, 
-                  fillColor: color, 
-                  fillOpacity: isSelected ? 0.45 : 0.25, 
-                  weight: isSelected ? 3 : 1.5
-                }}
-                eventHandlers={{
-                  click: () => handleSelectDistrict(d)
-                }}
-              />
+            <h2 style={{ fontSize: '1.6rem', fontWeight: 900, color: '#FFFFFF', margin: '0 0 4px' }}>
+              {selectedDistrict.name}
+            </h2>
 
-              {/* Clean minimal district pin */}
-              <Marker 
-                position={[d.lat, d.lng]}
-                icon={createMinimalPinIcon(d.name, d.risk)}
-                eventHandlers={{
-                  click: () => handleSelectDistrict(d)
+            <p style={{ fontSize: '0.9rem', color: '#CBD5E1', margin: '0 0 16px' }}>
+              Foco Sanitário: <strong style={{ color: '#FCD34D' }}>{selectedDistrict.disease}</strong>
+            </p>
+
+            {/* Metrics 3-Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center' }}>
+              <div style={{ backgroundColor: '#0F172A', padding: '10px 6px', borderRadius: '10px', border: '1px solid #1E293B' }}>
+                <span style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block', fontWeight: 700 }}>Ar (AQI)</span>
+                <strong style={{ fontSize: '1.1rem', color: '#F8FAFC' }}>{selectedDistrict.aqi}</strong>
+              </div>
+              <div style={{ backgroundColor: '#0F172A', padding: '10px 6px', borderRadius: '10px', border: '1px solid #1E293B' }}>
+                <span style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block', fontWeight: 700 }}>Casos 14d</span>
+                <strong style={{ fontSize: '1.1rem', color: '#EF4444' }}>{selectedDistrict.cases}</strong>
+              </div>
+              <div style={{ backgroundColor: '#0F172A', padding: '10px 6px', borderRadius: '10px', border: '1px solid #1E293B' }}>
+                <span style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block', fontWeight: 700 }}>Limpeza</span>
+                <strong style={{ fontSize: '1.1rem', color: '#10B981' }}>{selectedDistrict.cleanliness}/5 ⭐</strong>
+              </div>
+            </div>
+
+            {/* Temporal Peak Insight for Area */}
+            {temporalSummary && (
+              <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid #1E293B', fontSize: '0.8rem', color: '#94A3B8' }}>
+                <span style={{ color: '#60A5FA', fontWeight: 800 }}>Pico Temporal SP: </span>
+                <span>{temporalSummary.extremos.periodo_maior_ocorrencia.rotulo} ({Number(temporalSummary.extremos.periodo_maior_ocorrencia.total_casos).toLocaleString()} casos)</span>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Subprefeitura Picker */}
+          <div>
+            <label style={{ fontSize: '0.85rem', fontWeight: 800, color: '#94A3B8', display: 'block', marginBottom: '8px', textTransform: 'uppercase' }}>
+              Selecionar Subprefeitura no Mapa
+            </label>
+            <select
+              value={selectedDistrict.id}
+              onChange={(e) => {
+                const found = ALL_SP_DISTRICTS.find(d => d.id === Number(e.target.value));
+                if (found) handleSelectDistrict(found);
+              }}
+              style={{
+                width: '100%',
+                backgroundColor: '#1E293B',
+                color: '#FFFFFF',
+                border: '1px solid #334155',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                fontSize: '1rem',
+                fontWeight: 700,
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              {ALL_SP_DISTRICTS.map(d => (
+                <option key={d.id} value={d.id}>
+                  {d.name} ({d.zone}) — Subprefeitura {d.subprefeitura}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Area / Region Hospitals HUD Section */}
+          <div style={{ borderTop: '1px solid #1E293B', paddingTop: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+                  🏥 {hudScope === 'district' ? `Hospitais em ${selectedDistrict.name}` : `Hospitais na ${filterZone}`}
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: '#60A5FA', fontWeight: 700 }}>
+                  {hudHospitals.length} {hudHospitals.length === 1 ? 'unidade encontrada' : 'unidades encontradas'}
+                </span>
+              </div>
+
+              <select
+                value={hospitalFilter}
+                onChange={(e) => setHospitalFilter(e.target.value as any)}
+                style={{
+                  backgroundColor: '#1E293B',
+                  color: '#60A5FA',
+                  border: '1px solid #334155',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  outline: 'none'
                 }}
               >
-                <Popup>
-                  <div style={{ padding: '2px', fontFamily: 'Inter, sans-serif' }}>
-                    <h4 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 800 }}>{d.name} ({d.zone})</h4>
-                    <p style={{ margin: 0, fontSize: '11px', color: color, fontWeight: 700 }}>Risco {d.risk} • AQI {d.aqi}</p>
-                  </div>
-                </Popup>
-              </Marker>
-            </React.Fragment>
-          );
-        })}
-      </MapContainer>
+                <option value="Todos">Todos</option>
+                <option value="24h">Plantão 24h</option>
+                <option value="Emergência">Emergência</option>
+                <option value="SUS">SUS (Público)</option>
+                <option value="Filantrópico">Filantrópico</option>
+                <option value="Privado">Privado</option>
+              </select>
+            </div>
 
-      {/* Recenter Map Floating Button */}
-      <button 
-        onClick={() => {
-          setMapCenter([-23.5505, -46.6333]);
-          setSelectedDistrict(null);
-          setShowDrawer(false);
-        }}
-        style={{ position: 'absolute', bottom: showDrawer ? '250px' : '90px', right: '14px', zIndex: 1000, width: '42px', height: '42px', backgroundColor: '#0047AB', border: '2px solid #FFFFFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,71,171,0.3)', transition: 'bottom 0.3s ease' }}
-        title="Centralizar São Paulo"
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
-      </button>
-
-      {/* Clean Minimalist Bottom Sheet Drawer (Appears only on Selection) */}
-      {showDrawer && selectedDistrict && (
-        <div style={{ position: 'absolute', bottom: '0', left: '0', right: '0', zIndex: 1100, backgroundColor: '#FFFFFF', borderTopLeftRadius: '20px', borderTopRightRadius: '20px', padding: '16px 20px 24px', color: '#0F172A', borderTop: '1px solid #E2E8F0', boxShadow: '0 -6px 24px rgba(0,0,0,0.12)', animation: 'slideUp 0.25s ease-out' }}>
-          
-          {/* Drawer Handle */}
-          <div style={{ width: '36px', height: '4px', backgroundColor: '#E2E8F0', borderRadius: '2px', margin: '0 auto 12px' }}></div>
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0F172A' }}>{selectedDistrict.name}</h2>
-                <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>({selectedDistrict.zone})</span>
+            {/* Scope Switcher: District vs Entire Zone */}
+            {filterZone !== 'Todas' && (
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setHudScope('zone')}
+                  style={{
+                    flex: 1,
+                    padding: '6px 10px',
+                    borderRadius: '8px',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    backgroundColor: hudScope === 'zone' ? '#2563EB' : '#1E293B',
+                    color: hudScope === 'zone' ? '#FFFFFF' : '#94A3B8',
+                    border: hudScope === 'zone' ? '1px solid #3B82F6' : '1px solid #334155'
+                  }}
+                >
+                  🌐 Toda {filterZone}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHudScope('district')}
+                  style={{
+                    flex: 1,
+                    padding: '6px 10px',
+                    borderRadius: '8px',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    backgroundColor: hudScope === 'district' ? '#2563EB' : '#1E293B',
+                    color: hudScope === 'district' ? '#FFFFFF' : '#94A3B8',
+                    border: hudScope === 'district' ? '1px solid #3B82F6' : '1px solid #334155'
+                  }}
+                >
+                  📍 {selectedDistrict.name}
+                </button>
               </div>
-              <p style={{ fontSize: '12px', color: '#475569', margin: '2px 0 0' }}>
-                Foco Epidemiológico: <strong>{selectedDistrict.disease}</strong>
-              </p>
-            </div>
+            )}
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ backgroundColor: `${getRiskColor(selectedDistrict.risk)}15`, color: getRiskColor(selectedDistrict.risk), padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 800, border: `1px solid ${getRiskColor(selectedDistrict.risk)}30` }}>
-                ● {selectedDistrict.risk}
-              </span>
-              <button onClick={() => setShowDrawer(false)} style={{ background: 'none', border: 'none', color: '#94A3B8', fontSize: '16px', cursor: 'pointer', padding: '2px' }}>✕</button>
+            {/* List of Hospitals Rendered Dynamically */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {hudHospitals.length === 0 ? (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#94A3B8', backgroundColor: '#070B14', borderRadius: '12px', border: '1px dashed #334155' }}>
+                  <span style={{ fontSize: '1.5rem', display: 'block', marginBottom: '6px' }}>📍</span>
+                  <p style={{ margin: 0, fontSize: '0.9rem' }}>Nenhum hospital com este filtro nesta seleção.</p>
+                </div>
+              ) : (
+                hudHospitals.map(h => (
+                  <div
+                    key={`${h.id}-${selectedDistrict.id}`}
+                    onClick={() => {
+                      setSelectedHospital(h);
+                      setMapCenter([h.latitude, h.longitude]);
+                      setMapZoom(16);
+                    }}
+                    style={{
+                      backgroundColor: selectedHospital?.id === h.id ? 'rgba(59, 130, 246, 0.2)' : '#070B14',
+                      border: selectedHospital?.id === h.id ? '2px solid #3B82F6' : '1px solid #1E293B',
+                      borderRadius: '12px',
+                      padding: '14px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#60A5FA', backgroundColor: 'rgba(59, 130, 246, 0.15)', padding: '2px 8px', borderRadius: '4px' }}>
+                        {h.network || h.type}
+                      </span>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        {h.is_emergency && (
+                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#EF4444', backgroundColor: 'rgba(239, 68, 68, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>
+                            🚨 Emergência
+                          </span>
+                        )}
+                        {h.is_24h && (
+                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>
+                            ⏱ 24h
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#FFFFFF', margin: '0 0 4px', lineHeight: 1.3 }}>
+                      {h.name}
+                    </h4>
+
+                    <p style={{ fontSize: '0.85rem', color: '#94A3B8', margin: '0 0 6px', lineHeight: 1.4 }}>
+                      {h.specialties || 'Atendimento Geral'}
+                    </p>
+
+                    <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '0 0 10px' }}>
+                      📍 {h.address || 'São Paulo - SP'}
+                    </p>
+
+                    <div style={{ display: 'flex', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${h.latitude},${h.longitude}`, '_blank')}
+                        className="btn-emerald"
+                        style={{ flex: 1, padding: '8px 12px', fontSize: '0.85rem', borderRadius: '8px' }}
+                      >
+                        🗺️ Traçar Rota
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => window.location.href = `tel:${(h.phone || '').replace(/\D/g, '')}`}
+                        className="btn-secondary"
+                        style={{ flex: 1, padding: '8px 12px', fontSize: '0.85rem', borderRadius: '8px' }}
+                      >
+                        📞 {h.phone || '(11) 156'}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
-          {/* Clean Metric Chips */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '14px' }}>
-            <div style={{ backgroundColor: '#F8FAFC', padding: '8px 10px', borderRadius: '10px', textAlign: 'center', border: '1px solid #F1F5F9' }}>
-              <span style={{ fontSize: '10px', color: '#64748B', fontWeight: 600 }}>Qualidade Ar</span>
-              <p style={{ margin: 0, fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>{selectedDistrict.aqi} AQI</p>
-            </div>
-            <div style={{ backgroundColor: '#F8FAFC', padding: '8px 10px', borderRadius: '10px', textAlign: 'center', border: '1px solid #F1F5F9' }}>
-              <span style={{ fontSize: '10px', color: '#64748B', fontWeight: 600 }}>Casos 14d</span>
-              <p style={{ margin: 0, fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>{selectedDistrict.cases}</p>
-            </div>
-            <div style={{ backgroundColor: '#F8FAFC', padding: '8px 10px', borderRadius: '10px', textAlign: 'center', border: '1px solid #F1F5F9' }}>
-              <span style={{ fontSize: '10px', color: '#64748B', fontWeight: 600 }}>Limpeza</span>
-              <p style={{ margin: 0, fontSize: '13px', fontWeight: 800, color: '#34C759' }}>{selectedDistrict.cleanliness}/5 ⭐</p>
-            </div>
-          </div>
+        </aside>
 
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button 
-              onClick={() => navigate('/map/facilities')}
-              style={{ flex: 1, padding: '10px', backgroundColor: '#0047AB', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}
+        {/* Right Fluid Leaflet GIS Map View */}
+        <div style={{ position: 'relative', borderRadius: '20px', overflow: 'hidden', border: '1px solid #1E293B', boxShadow: '0 16px 40px rgba(0,0,0,0.6)' }}>
+          
+          {/* Top-Left Floating GIS Layer & Basemap Switcher Toolbar */}
+          <div className="gis-map-toolbar">
+            <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#60A5FA', textTransform: 'uppercase', marginRight: '4px' }}>
+              🗺️ Camada:
+            </span>
+            <button
+              type="button"
+              className={`gis-map-btn ${basemap === 'dark' ? 'active' : ''}`}
+              onClick={() => setBasemap('dark')}
+              title="Visualização Dark Obsidian"
             >
-              🏥 Hospitais e UBSs
+              🌙 Dark
             </button>
-            <button 
-              onClick={() => navigate('/form/evaluation')}
-              style={{ flex: 1, padding: '10px', backgroundColor: '#F1F5F9', color: '#0F172A', border: '1px solid #CBD5E1', borderRadius: '10px', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}
+            <button
+              type="button"
+              className={`gis-map-btn ${basemap === 'satellite' ? 'active' : ''}`}
+              onClick={() => setBasemap('satellite')}
+              title="Visualização Satélite HD"
             >
-              📝 Avaliar Bairro
+              🛰️ Satélite
+            </button>
+            <button
+              type="button"
+              className={`gis-map-btn ${basemap === 'street' ? 'active' : ''}`}
+              onClick={() => setBasemap('street')}
+              title="Visualização Ruas & Topografia"
+            >
+              🏙️ Ruas
+            </button>
+
+            <div style={{ width: '1px', height: '18px', backgroundColor: '#334155', margin: '0 4px' }}></div>
+
+            <button
+              type="button"
+              className={`gis-map-btn ${mapLayerMode === 'all' ? 'active' : ''}`}
+              onClick={() => setMapLayerMode('all')}
+              title="Exibir Zonas de Risco e Hospitais"
+            >
+              🌐 Completo
+            </button>
+            <button
+              type="button"
+              className={`gis-map-btn ${mapLayerMode === 'risk' ? 'active' : ''}`}
+              onClick={() => setMapLayerMode('risk')}
+              title="Apenas Zonas de Risco"
+            >
+              🌡️ Risco
+            </button>
+            <button
+              type="button"
+              className={`gis-map-btn ${mapLayerMode === 'hospitals' ? 'active' : ''}`}
+              onClick={() => setMapLayerMode('hospitals')}
+              title="Apenas Hospitais"
+            >
+              🏥 Hospitais
             </button>
           </div>
+
+          {/* Top-Right Map Status Floating Legend */}
+          <div style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 1000, backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', padding: '10px 18px', borderRadius: '14px', border: '1px solid #334155', display: 'flex', gap: '14px', fontSize: '0.85rem', fontWeight: 800, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+            <span style={{ color: '#EF4444', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#EF4444', display: 'inline-block' }}></span>
+              Risco Alto
+            </span>
+            <span style={{ color: '#F59E0B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#F59E0B', display: 'inline-block' }}></span>
+              Risco Médio
+            </span>
+            <span style={{ color: '#10B981', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10B981', display: 'inline-block' }}></span>
+              Risco Baixo
+            </span>
+          </div>
+
+          <MapContainer
+            center={mapCenter}
+            zoom={mapZoom}
+            style={{ height: '100%', width: '100%', minHeight: '680px', backgroundColor: '#070B14' }}
+            zoomControl={false}
+          >
+            {/* Dynamic Basemap Tile Layer (Dark Obsidian, Satellite HD, Street) */}
+            <TileLayer
+              key={basemap}
+              url={basemapUrls[basemap].url}
+              attribution={basemapUrls[basemap].attribution}
+            />
+            <MapFlyTo center={mapCenter} zoom={mapZoom} />
+
+            {/* Clean Modern Risk Polygons with Smooth Glassmorphism Fills */}
+            {(mapLayerMode === 'all' || mapLayerMode === 'risk') && filteredDistricts.map(district => {
+              const isSelected = selectedDistrict.id === district.id;
+              const riskColor = getRiskColor(district.risk);
+
+              return (
+                <Polygon
+                  key={district.id}
+                  positions={district.polygon}
+                  pathOptions={{
+                    color: isSelected ? '#38BDF8' : riskColor,
+                    fillColor: riskColor,
+                    fillOpacity: isSelected ? 0.65 : 0.38,
+                    weight: isSelected ? 4 : 2,
+                    dashArray: isSelected ? undefined : '2, 2'
+                  }}
+                  eventHandlers={{
+                    click: () => handleSelectDistrict(district)
+                  }}
+                >
+                  <Tooltip direction="center" permanent={false} className="custom-district-tooltip">
+                    <div style={{ padding: '4px 6px' }}>
+                      <div style={{ fontSize: '14px', fontWeight: 900, color: '#FFFFFF' }}>{district.name}</div>
+                      <div style={{ color: '#94A3B8', fontSize: '11px', marginTop: '2px' }}>{district.zone} • Subprefeitura {district.subprefeitura}</div>
+                      <div style={{ color: riskColor, fontSize: '12px', fontWeight: 800, marginTop: '4px' }}>
+                        ● Nível de Risco {district.risk} ({district.cases} casos)
+                      </div>
+                    </div>
+                  </Tooltip>
+                </Polygon>
+              );
+            })}
+
+            {/* Hospital Markers: Clean and Smart Display without map clutter */}
+            {(mapLayerMode === 'all' || mapLayerMode === 'hospitals') && pinMode !== 'none' && mapVisibleHospitals.map(h => {
+              const isSelected = selectedHospital?.id === h.id;
+              const isDistrictHospital = selectedDistrict.hospitalIds.includes(h.id);
+
+              return (
+                <Marker
+                  key={`${h.id}-${selectedDistrict.id}`}
+                  position={[h.latitude, h.longitude]}
+                  icon={createDarkHospitalMarkerIcon(h, isSelected, isDistrictHospital)}
+                  eventHandlers={{
+                    click: () => {
+                      setSelectedHospital(h);
+                      setMapCenter([h.latitude, h.longitude]);
+                    }
+                  }}
+                >
+                  <Popup>
+                    <div style={{ minWidth: '220px', padding: '4px', color: '#0F172A' }}>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 800 }}>{h.name}</h4>
+                      <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#64748B' }}>📍 {h.district} ({h.zone})</p>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: '#475569' }}>{h.address}</p>
+                      <p style={{ margin: '0 0 8px 0', fontSize: '11px', color: '#0047AB', fontWeight: 700 }}>{h.specialties}</p>
+                      <button
+                        type="button"
+                        onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${h.latitude},${h.longitude}`, '_blank')}
+                        style={{ width: '100%', backgroundColor: '#10B981', color: '#FFF', border: 'none', padding: '8px', borderRadius: '6px', fontSize: '12px', fontWeight: 800, cursor: 'pointer' }}
+                      >
+                        🗺️ Traçar Rota no GPS
+                      </button>
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
+          </MapContainer>
 
         </div>
-      )}
 
-      <style>{`
-        @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to { transform: translateY(0); }
-        }
-      `}</style>
+      </div>
+
     </div>
   );
 }

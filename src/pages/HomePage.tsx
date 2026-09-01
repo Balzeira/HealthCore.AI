@@ -1,372 +1,657 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
-
-interface NewsItem {
-  id: number;
-  category: string;
-  category_color: string;
-  title: string;
-  summary: string;
-  source: string;
-  minutes_ago: number;
-  read_time: string;
-  impact: string;
-  timestamp?: string;
-}
-
-interface NewsResponse {
-  last_updated: string;
-  next_refresh_in_seconds: number;
-  news: NewsItem[];
-}
+import { ALL_SP_DISTRICTS } from '../data/spBoundaries';
+import { ALL_SP_HOSPITALS } from '../data/hospitalsData';
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [newsLoading, setNewsLoading] = useState(true);
-  const [regions, setRegions] = useState<any[]>([]);
-  const [cityStats, setCityStats] = useState<any>(null);
-  const [selectedNeighborhoodId, setSelectedNeighborhoodId] = useState<number>(4); // Vila Mariana default
-  const [newsList, setNewsList] = useState<NewsItem[]>([]);
-  const [newsFilter, setNewsFilter] = useState<string>('Todos');
-  const [newsSearch, setNewsSearch] = useState<string>('');
-  const [lastUpdated, setLastUpdated] = useState<string>('');
-  const [countdown, setCountdown] = useState<number>(1200); // 20 minutes = 1200s
+  const [selectedQuickRegion, setSelectedQuickRegion] = useState(ALL_SP_DISTRICTS[0]);
+
+  // SUS & Temporal Analysis State
+  const [periodPreset, setPeriodPreset] = useState<'all' | '2025' | '2026' | 'custom'>('all');
+  const [startDate, setStartDate] = useState<string>('2024-01-01');
+  const [endDate, setEndDate] = useState<string>('2026-12-31');
+  const [statsData, setStatsData] = useState<any>(null);
+  const [temporalData, setTemporalData] = useState<any>(null);
+  const [loadingAnalysis, setLoadingAnalysis] = useState<boolean>(false);
 
   useEffect(() => {
-    fetchRegions();
-    fetchCityStats();
-    fetchNews();
+    loadStats();
+    loadTemporalAnalysis(startDate, endDate);
   }, []);
 
-  // Timer countdown for 20-minute auto refresh
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          fetchNews();
-          return 1200;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  const fetchRegions = async () => {
+  const loadStats = async () => {
     try {
-      const data = await api.get<any[]>('/regions');
-      setRegions(Array.isArray(data) ? data : []);
+      const data = await api.get('/stats');
+      setStatsData(data);
     } catch (err) {
-      console.error("Failed to load regions", err);
+      console.warn('Backend stats fallback:', err);
+    }
+  };
+
+  const loadTemporalAnalysis = async (start?: string, end?: string) => {
+    setLoadingAnalysis(true);
+    try {
+      let query = '';
+      if (start && end) query = `?start_date=${start}&end_date=${end}`;
+      const data = await api.get(`/stats/temporal-analysis${query}`);
+      setTemporalData(data);
+    } catch (err) {
+      console.warn('Temporal analysis fallback:', err);
     } finally {
-      setLoading(false);
+      setLoadingAnalysis(false);
     }
   };
 
-  const fetchCityStats = async () => {
-    try {
-      const data = await api.get<any>('/stats');
-      if (data) setCityStats(data);
-    } catch (err) {
-      console.error("Failed to load city stats", err);
+  const handlePresetChange = (preset: 'all' | '2025' | '2026' | 'custom') => {
+    setPeriodPreset(preset);
+    let s = '2024-01-01';
+    let e = '2026-12-31';
+
+    if (preset === '2025') {
+      s = '2025-01-01';
+      e = '2025-12-31';
+    } else if (preset === '2026') {
+      s = '2026-01-01';
+      e = '2026-12-31';
+    }
+
+    if (preset !== 'custom') {
+      setStartDate(s);
+      setEndDate(e);
+      loadTemporalAnalysis(s, e);
     }
   };
 
-  const fetchNews = async () => {
-    setNewsLoading(true);
-    try {
-      const data = await api.get<NewsResponse>('/news');
-      if (data && data.news) {
-        setNewsList(data.news);
-        setLastUpdated(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
-        if (data.next_refresh_in_seconds) {
-          setCountdown(data.next_refresh_in_seconds);
-        }
-      } else {
-        setNewsList(fallbackNews);
-      }
-    } catch (err) {
-      console.error("Failed to fetch live news", err);
-      setNewsList(fallbackNews);
-      setLastUpdated(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
-    } finally {
-      setNewsLoading(false);
+  const handleApplyCustomDates = () => {
+    if (startDate && endDate) {
+      loadTemporalAnalysis(startDate, endDate);
     }
   };
 
-  const formatCountdown = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // Mock neighborhood metrics for interactive selector
-  const neighborhoodPresets: Record<number, any> = {
-    1: { name: 'Sé', risk: 'Alto', riskColor: '#FF3B30', riskBg: '#FFE5E3', aqi: '120 • Ruim', humidity: '52%', dengue: 'Alta (120 casos/100k)', area: 'Região Central' },
-    2: { name: 'Pinheiros', risk: 'Baixo', riskColor: '#34C759', riskBg: '#E8F8EE', aqi: '45 • Excelente', humidity: '62%', dengue: 'Baixa (15 casos/100k)', area: 'Zona Oeste' },
-    3: { name: 'Itaquera', risk: 'Alto', riskColor: '#FF3B30', riskBg: '#FFE5E3', aqi: '110 • Moderado', humidity: '58%', dengue: 'Alta (300 casos/100k)', area: 'Zona Leste' },
-    4: { name: 'Vila Mariana', risk: 'Baixo', riskColor: '#34C759', riskBg: '#E8F8EE', aqi: '42 • Excelente', humidity: '65%', dengue: 'Nula / Baixa (32 casos/100k)', area: 'Zona Sul' },
-    5: { name: 'Moema', risk: 'Baixo', riskColor: '#34C759', riskBg: '#E8F8EE', aqi: '38 • Ótima', humidity: '68%', dengue: 'Controlada (12 casos/100k)', area: 'Zona Sul' },
-    6: { name: 'Bela Vista', risk: 'Médio', riskColor: '#F5A623', riskBg: '#FFF3E0', aqi: '78 • Moderado', humidity: '56%', dengue: 'Média (90 casos/100k)', area: 'Região Central' }
-  };
-
-  const currentMetrics = neighborhoodPresets[selectedNeighborhoodId] || neighborhoodPresets[4];
-
-  const filteredNews = newsList.filter(item => {
-    const matchesCat = newsFilter === 'Todos' || item.category.toLowerCase().includes(newsFilter.toLowerCase());
-    const matchesSearch = item.title.toLowerCase().includes(newsSearch.toLowerCase()) || item.summary.toLowerCase().includes(newsSearch.toLowerCase());
-    return matchesCat && matchesSearch;
-  });
+  const totalCasesDisplay = temporalData?.totais_periodo?.total_casos_notificados || statsData?.epidemiology?.total_cases_tracked || 449404;
 
   return (
-    <div className="home-page" style={{ padding: '20px', maxWidth: '430px', margin: '0 auto', fontFamily: 'Inter, sans-serif', paddingBottom: '5rem' }}>
-      <header style={{ marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-          <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#0047AB', margin: 0, letterSpacing: '-0.5px' }}>Observatório de Saúde Urbana</h1>
-          <span style={{ backgroundColor: '#E8F8EE', color: '#2E7D32', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '14px', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 2px 6px rgba(52,199,89,0.2)' }}>
-            <span style={{ width: '7px', height: '7px', backgroundColor: '#34C759', borderRadius: '50%', display: 'inline-block', animation: 'pulse 1.5s infinite' }}></span>
-            Ao Vivo
-          </span>
-        </div>
-        <p style={{ fontSize: '13px', color: '#666', margin: 0 }}>São Paulo • Monitoramento Epidemiológico Inteligente</p>
-      </header>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '36px' }}>
+      
+      {/* Hero Welcome Banner */}
+      <section style={{
+        background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%)',
+        border: '1px solid #334155',
+        borderRadius: '24px',
+        padding: '40px 48px',
+        boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        <div style={{ position: 'relative', zIndex: 2, maxWidth: '960px' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.4)', padding: '8px 18px', borderRadius: '30px', color: '#60A5FA', fontWeight: 800, fontSize: '0.9rem', marginBottom: '16px' }}>
+            <span>🏙️</span>
+            <span>Sistema Integrado de Saúde da Capital Paulista • Dados Oficiais do SUS</span>
+          </div>
 
-      {/* City Overview Live Stats Bar */}
-      <section style={{ backgroundColor: 'linear-gradient(135deg, #0047AB 0%, #002D62 100%)', background: '#0047AB', borderRadius: '16px', padding: '14px', color: '#fff', marginBottom: '20px', boxShadow: '0 4px 16px rgba(0,71,171,0.25)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.9 }}>Panorama da Capital</span>
-          <span style={{ fontSize: '10px', backgroundColor: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: '10px', fontWeight: 600 }}>10 Bairros Ativos</span>
-        </div>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', textAlign: 'center' }}>
-          <div style={{ backgroundColor: 'rgba(255,255,255,0.12)', padding: '8px 4px', borderRadius: '10px', backdropFilter: 'blur(4px)' }}>
-            <div style={{ fontSize: '16px', fontWeight: 800 }}>{cityStats ? cityStats.risk_summary.high : 3}</div>
-            <div style={{ fontSize: '10px', opacity: 0.85 }}>Em Alerta 🔴</div>
-          </div>
-          <div style={{ backgroundColor: 'rgba(255,255,255,0.12)', padding: '8px 4px', borderRadius: '10px', backdropFilter: 'blur(4px)' }}>
-            <div style={{ fontSize: '16px', fontWeight: 800 }}>{cityStats ? `${cityStats.air_quality.avg_aqi} AQI` : '64 AQI'}</div>
-            <div style={{ fontSize: '10px', opacity: 0.85 }}>Média Ar 🌬️</div>
-          </div>
-          <div style={{ backgroundColor: 'rgba(255,255,255,0.12)', padding: '8px 4px', borderRadius: '10px', backdropFilter: 'blur(4px)' }}>
-            <div style={{ fontSize: '16px', fontWeight: 800 }}>{cityStats ? cityStats.community.active_agents_online : 184}</div>
-            <div style={{ fontSize: '10px', opacity: 0.85 }}>Agentes Online 👥</div>
-          </div>
-        </div>
-      </section>
+          <h1 style={{ fontSize: '2.5rem', fontWeight: 900, color: '#FFFFFF', margin: '0 0 12px', lineHeight: 1.2, letterSpacing: '-0.5px' }}>
+            Observatório Epidemiológico & Rede Hospitalar de São Paulo
+          </h1>
 
-      {/* Current Neighborhood Card with Selector */}
-      <section style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.06)', marginBottom: '20px', border: '1px solid #E5E7EB' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: '11px', color: '#6B7280', fontWeight: 700, display: 'block', marginBottom: '2px' }}>SELECIONE O BAIRRO</label>
-            <select 
-              value={selectedNeighborhoodId}
-              onChange={(e) => setSelectedNeighborhoodId(Number(e.target.value))}
-              style={{ fontSize: '16px', fontWeight: 800, border: 'none', background: 'transparent', color: '#1A1A2E', outline: 'none', cursor: 'pointer', padding: 0 }}
+          <p style={{ fontSize: '1.15rem', color: '#94A3B8', margin: '0 0 28px', lineHeight: 1.6 }}>
+            Monitoramento contínuo das 32 subprefeituras da capital com dados públicos e oficiais do <strong>Ministério da Saúde / SUS / CNES</strong>, catalogação completa da rede hospitalar e inteligência epidemiológica com análise histórica por períodos.
+          </p>
+
+          {/* Primary Action Buttons */}
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            <button 
+              onClick={() => navigate('/map')} 
+              className="btn-primary"
+              style={{ fontSize: '1.1rem', padding: '16px 32px' }}
             >
-              <option value={4}>Vila Mariana (Zona Sul)</option>
-              <option value={1}>Sé (Região Central)</option>
-              <option value={2}>Pinheiros (Zona Oeste)</option>
-              <option value={3}>Itaquera (Zona Leste)</option>
-              <option value={5}>Moema (Zona Sul)</option>
-              <option value={6}>Bela Vista (Região Central)</option>
-            </select>
-          </div>
-          <span style={{ backgroundColor: currentMetrics.riskBg, color: currentMetrics.riskColor, padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 800, border: `1px solid ${currentMetrics.riskColor}40` }}>
-            ● Risco {currentMetrics.risk}
-          </span>
-        </div>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
-          <div style={{ backgroundColor: '#F9FAFB', padding: '12px', borderRadius: '12px', border: '1px solid #F3F4F6' }}>
-            <p style={{ fontSize: '11px', color: '#6B7280', margin: '0 0 4px 0', fontWeight: 600 }}>Qualidade do Ar (AQI)</p>
-            <p style={{ fontSize: '15px', fontWeight: 800, margin: 0, color: '#34C759' }}>{currentMetrics.aqi}</p>
-          </div>
-          <div style={{ backgroundColor: '#F9FAFB', padding: '12px', borderRadius: '12px', border: '1px solid #F3F4F6' }}>
-            <p style={{ fontSize: '11px', color: '#6B7280', margin: '0 0 4px 0', fontWeight: 600 }}>Umidade Relativa</p>
-            <p style={{ fontSize: '15px', fontWeight: 800, margin: 0, color: '#0047AB' }}>{currentMetrics.humidity}</p>
-          </div>
-          <div style={{ backgroundColor: '#F9FAFB', padding: '12px', borderRadius: '12px', border: '1px solid #F3F4F6', gridColumn: 'span 2' }}>
-            <p style={{ fontSize: '11px', color: '#6B7280', margin: '0 0 4px 0', fontWeight: 600 }}>Incidência Arbovirose</p>
-            <p style={{ fontSize: '14px', fontWeight: 800, margin: 0, color: currentMetrics.riskColor }}>{currentMetrics.dengue}</p>
+              <span>🗺️</span>
+              <span>Abrir Mapa Geográfico de SP</span>
+            </button>
+
+            <button 
+              onClick={() => navigate('/map/facilities')} 
+              className="btn-secondary"
+              style={{ fontSize: '1.1rem', padding: '16px 32px' }}
+            >
+              <span>🏥</span>
+              <span>Consultar Todos os Hospitais (45+)</span>
+            </button>
           </div>
         </div>
 
-        <button 
-          onClick={() => navigate('/map')}
-          style={{ width: '100%', padding: '12px', backgroundColor: '#0047AB', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(0,71,171,0.2)' }}
-        >
-          Explorar Detalhes no Mapa ▶
-        </button>
-        <p style={{ fontSize: '10px', color: '#9CA3AF', textAlign: 'center', marginTop: '8px', marginBottom: 0 }}>
-          Última atualização: Hoje às {lastUpdated || '14:30'}
-        </p>
-      </section>
-
-      {/* Quick Access */}
-      <section style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-        <button 
-          onClick={() => navigate('/map')}
-          style={{ flex: 1, padding: '14px', backgroundColor: '#0047AB', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 700, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(0,71,171,0.2)' }}
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="18"></line><line x1="15" y1="6" x2="15" y2="21"></line></svg>
-          Explorar Mapa
-        </button>
-        <button 
-          onClick={() => navigate('/game')}
-          style={{ flex: 1, padding: '14px', backgroundColor: '#fff', color: '#0047AB', border: '2px solid #0047AB', borderRadius: '12px', fontWeight: 700, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-          Iniciar Missão Agente
-        </button>
-      </section>
-
-      {/* Agent Status */}
-      <section style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '14px 16px', border: '1px solid #E5E7EB', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
-        <div style={{ flex: 1 }}>
-          <span style={{ fontSize: '11px', color: '#0047AB', fontWeight: 700, textTransform: 'uppercase' }}>Status do Agente</span>
-          <p style={{ fontSize: '13px', fontWeight: 700, margin: '2px 0 0 0', color: '#1A1A2E' }}>Você possui 3 missões pendentes na região sul</p>
-        </div>
-        <div style={{ display: 'flex', marginLeft: '12px' }}>
-          {[1, 2, 3].map((i) => (
-            <div key={i} style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: ['#0047AB', '#34C759', '#F5A623'][i-1], border: '2px solid #fff', marginLeft: '-10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '10px', fontWeight: 'bold' }}>
-              A{i}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Live News Section */}
-      <section>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+        {/* Live Macro Metrics Ticker with Real SUS Data */}
+        <div style={{ marginTop: '36px', paddingTop: '28px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
           <div>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#1A1A2E' }}>Notícias em Tempo Real</h3>
-            <span style={{ fontSize: '11px', color: '#6B7280' }}>
-              Próxima atualização em: <strong style={{ color: '#0047AB' }}>{formatCountdown(countdown)}</strong>
+            <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+              Subprefeituras Monitoradas
+            </span>
+            <span style={{ fontSize: '1.8rem', fontWeight: 900, color: '#F8FAFC' }}>
+              32 Regiões
             </span>
           </div>
-          <button 
-            onClick={fetchNews}
-            disabled={newsLoading}
-            style={{ backgroundColor: '#F3F4F6', color: '#374151', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-          >
-            🔄 {newsLoading ? 'Atualizando...' : 'Atualizar'}
-          </button>
-        </div>
 
-        {/* News Filters & Search */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
-          <input 
-            type="text" 
-            placeholder="Pesquisar notícias..." 
-            value={newsSearch}
-            onChange={(e) => setNewsSearch(e.target.value)}
-            style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1px solid #E5E7EB', fontSize: '12px', outline: 'none' }}
-          />
-          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
-            {['Todos', 'Vacinação', 'Arboviroses', 'Ar & Ambiente', 'Vigilância'].map(cat => (
-              <button
-                key={cat}
-                onClick={() => setNewsFilter(cat)}
-                style={{
-                  padding: '5px 10px', borderRadius: '14px', fontSize: '11px', fontWeight: 700, border: 'none',
-                  backgroundColor: newsFilter === cat ? '#0047AB' : '#F3F4F6',
-                  color: newsFilter === cat ? '#FFF' : '#4B5563', cursor: 'pointer', whiteSpace: 'nowrap'
-                }}
-              >
-                {cat}
-              </button>
-            ))}
+          <div>
+            <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+              Casos Reais SUS (Notificados)
+            </span>
+            <span style={{ fontSize: '1.8rem', fontWeight: 900, color: '#EF4444' }}>
+              {Number(totalCasesDisplay).toLocaleString('pt-BR')}
+            </span>
+          </div>
+
+          <div>
+            <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+              Hospitais Mapeados (CNES)
+            </span>
+            <span style={{ fontSize: '1.8rem', fontWeight: 900, color: '#3B82F6' }}>
+              45+ Unidades
+            </span>
+          </div>
+
+          <div>
+            <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+              Fonte Oficial Integrada
+            </span>
+            <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#10B981', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>✓ SUS / MS</span>
+            </span>
           </div>
         </div>
-        
-        {newsLoading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {[1, 2, 3].map((n) => (
-              <div key={n} style={{ padding: '16px', backgroundColor: '#F3F4F6', borderRadius: '12px', height: '80px', animation: 'pulse 1.5s infinite' }}></div>
-            ))}
+      </section>
+
+      {/* Temporal Analysis & Historical Date Filter Layer (Análise por Datas Oficial) */}
+      <section className="hud-card" style={{ border: '1px solid #334155', backgroundColor: '#0B1120' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '1.4rem' }}>📊</span>
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#FFFFFF', margin: 0 }}>
+                Análise Temporal de Ocorrências (Série Histórica SUS)
+              </h2>
+            </div>
+            <p style={{ fontSize: '0.95rem', color: '#94A3B8', margin: '4px 0 0' }}>
+              Identificação automática de picos, meses de maior e menor incidência e evolução temporal calculada a partir de dados reais.
+            </p>
+          </div>
+
+          {/* Period Selector Pills */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => handlePresetChange('all')}
+              style={{
+                padding: '8px 16px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer',
+                backgroundColor: periodPreset === 'all' ? '#3B82F6' : '#1E293B',
+                color: periodPreset === 'all' ? '#FFF' : '#94A3B8',
+                border: periodPreset === 'all' ? '1px solid #3B82F6' : '1px solid #334155'
+              }}
+            >
+              Série Completa
+            </button>
+            <button
+              onClick={() => handlePresetChange('2025')}
+              style={{
+                padding: '8px 16px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer',
+                backgroundColor: periodPreset === '2025' ? '#3B82F6' : '#1E293B',
+                color: periodPreset === '2025' ? '#FFF' : '#94A3B8',
+                border: periodPreset === '2025' ? '1px solid #3B82F6' : '1px solid #334155'
+              }}
+            >
+              Ano 2025
+            </button>
+            <button
+              onClick={() => handlePresetChange('2026')}
+              style={{
+                padding: '8px 16px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer',
+                backgroundColor: periodPreset === '2026' ? '#3B82F6' : '#1E293B',
+                color: periodPreset === '2026' ? '#FFF' : '#94A3B8',
+                border: periodPreset === '2026' ? '1px solid #3B82F6' : '1px solid #334155'
+              }}
+            >
+              Ano 2026
+            </button>
+            <button
+              onClick={() => handlePresetChange('custom')}
+              style={{
+                padding: '8px 16px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer',
+                backgroundColor: periodPreset === 'custom' ? '#3B82F6' : '#1E293B',
+                color: periodPreset === 'custom' ? '#FFF' : '#94A3B8',
+                border: periodPreset === 'custom' ? '1px solid #3B82F6' : '1px solid #334155'
+              }}
+            >
+              Personalizado 📅
+            </button>
+          </div>
+        </div>
+
+        {/* Custom Date Pickers (Shown if 'custom' is selected) */}
+        {periodPreset === 'custom' && (
+          <div style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '20px', padding: '16px', backgroundColor: '#070B14', borderRadius: '12px', border: '1px solid #1E293B' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#94A3B8' }}>Data Inicial:</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+                style={{ backgroundColor: '#1E293B', color: '#FFF', border: '1px solid #334155', padding: '8px 12px', borderRadius: '8px', fontSize: '0.9rem', outline: 'none' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#94A3B8' }}>Data Final:</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => setEndDate(e.target.value)}
+                style={{ backgroundColor: '#1E293B', color: '#FFF', border: '1px solid #334155', padding: '8px 12px', borderRadius: '8px', fontSize: '0.9rem', outline: 'none' }}
+              />
+            </div>
+            <button
+              onClick={handleApplyCustomDates}
+              className="btn-primary"
+              style={{ padding: '8px 18px', fontSize: '0.85rem' }}
+            >
+              Aplicar Filtro de Datas ▶
+            </button>
+          </div>
+        )}
+
+        {/* Temporal Analysis Calculated Insights Cards (3 Colunas Exatas) */}
+        {temporalData ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+            
+            {/* Card 1: Maior Ocorrência */}
+            <div style={{ backgroundColor: '#070B14', padding: '20px', borderRadius: '14px', border: '1px solid #334155' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#F87171', backgroundColor: 'rgba(239, 68, 68, 0.15)', padding: '3px 10px', borderRadius: '6px' }}>
+                  MAIOR OCORRÊNCIA (PICO)
+                </span>
+                <span style={{ fontSize: '0.8rem', color: '#94A3B8', fontWeight: 700 }}>
+                  {temporalData.extremos.periodo_maior_ocorrencia.participacao_percentual}% do total
+                </span>
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#FFFFFF', margin: '0 0 6px' }}>
+                {temporalData.extremos.periodo_maior_ocorrencia.rotulo}
+              </h3>
+              <p style={{ fontSize: '0.95rem', color: '#EF4444', fontWeight: 800, margin: '0 0 8px' }}>
+                {Number(temporalData.extremos.periodo_maior_ocorrencia.total_casos).toLocaleString('pt-BR')} casos notificados
+              </p>
+              <p style={{ fontSize: '0.85rem', color: '#94A3B8', margin: 0, lineHeight: 1.4 }}>
+                {temporalData.sintese_automatica.destaque_maior_periodo}
+              </p>
+            </div>
+
+            {/* Card 2: Menor Ocorrência */}
+            <div style={{ backgroundColor: '#070B14', padding: '20px', borderRadius: '14px', border: '1px solid #334155' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#34D399', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '3px 10px', borderRadius: '6px' }}>
+                  MENOR OCORRÊNCIA (MÍNIMO)
+                </span>
+                <span style={{ fontSize: '0.8rem', color: '#94A3B8', fontWeight: 700 }}>
+                  {temporalData.extremos.periodo_menor_ocorrencia.participacao_percentual}% do total
+                </span>
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#FFFFFF', margin: '0 0 6px' }}>
+                {temporalData.extremos.periodo_menor_ocorrencia.rotulo}
+              </h3>
+              <p style={{ fontSize: '0.95rem', color: '#10B981', fontWeight: 800, margin: '0 0 8px' }}>
+                {Number(temporalData.extremos.periodo_menor_ocorrencia.total_casos).toLocaleString('pt-BR')} casos notificados
+              </p>
+              <p style={{ fontSize: '0.85rem', color: '#94A3B8', margin: 0, lineHeight: 1.4 }}>
+                {temporalData.sintese_automatica.destaque_menor_periodo}
+              </p>
+            </div>
+
+            {/* Card 3: Comparação com Período Anterior */}
+            <div style={{ backgroundColor: '#070B14', padding: '20px', borderRadius: '14px', border: '1px solid #334155' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#60A5FA', backgroundColor: 'rgba(59, 130, 246, 0.15)', padding: '3px 10px', borderRadius: '6px' }}>
+                  COMPARAÇÃO TEMPORAL
+                </span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: temporalData.comparacao_periodo_anterior.variacao_percentual >= 0 ? '#EF4444' : '#10B981' }}>
+                  {temporalData.comparacao_periodo_anterior.variacao_percentual >= 0 ? '▲ +' : '▼ '}
+                  {temporalData.comparacao_periodo_anterior.variacao_percentual}%
+                </span>
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#FFFFFF', margin: '0 0 6px' }}>
+                Variação Entre Períodos
+              </h3>
+              <p style={{ fontSize: '0.95rem', color: '#FCD34D', fontWeight: 800, margin: '0 0 8px' }}>
+                Tendência: {temporalData.comparacao_periodo_anterior.tendencia === 'crescimento' ? 'Em Crescimento' : temporalData.comparacao_periodo_anterior.tendencia === 'queda' ? 'Em Queda' : 'Estável'}
+              </p>
+              <p style={{ fontSize: '0.85rem', color: '#CBD5E1', margin: 0, lineHeight: 1.4 }}>
+                {temporalData.sintese_automatica.destaque_variacao_recente}
+              </p>
+            </div>
+
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {filteredNews.length === 0 ? (
-              <p style={{ fontSize: '12px', color: '#9CA3AF', textAlign: 'center', padding: '20px 0' }}>Nenhuma notícia encontrada para esta busca.</p>
-            ) : (
-              filteredNews.map((item) => (
-                <article key={item.id} style={{ backgroundColor: '#fff', padding: '14px', borderRadius: '14px', boxShadow: '0 2px 10px rgba(0,0,0,0.04)', border: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '10px', fontWeight: 800, color: item.category_color, backgroundColor: `${item.category_color}15`, padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
-                      {item.category}
-                    </span>
-                    <span style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 600 }}>
-                      ⏱ Há {item.minutes_ago} min • {item.read_time}
-                    </span>
-                  </div>
-                  
-                  <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#1A1A2E', margin: 0, lineHeight: '1.4' }}>
-                    {item.title}
-                  </h4>
-
-                  <p style={{ fontSize: '12px', color: '#4B5563', margin: 0, lineHeight: '1.45' }}>
-                    {item.summary}
-                  </p>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #F3F4F6', paddingTop: '8px', marginTop: '4px' }}>
-                    <span style={{ fontSize: '10px', color: '#9CA3AF', fontWeight: 600 }}>Fonte: {item.source}</span>
-                    <span style={{ fontSize: '10px', fontWeight: 700, color: '#0047AB' }}>Ver detalhes ▶</span>
-                  </div>
-                </article>
-              ))
-            )}
+          <div style={{ padding: '20px', textAlign: 'center', color: '#94A3B8' }}>
+            Carregando indicadores temporais do SUS...
           </div>
         )}
       </section>
 
-      <style>{`
-        @keyframes pulse {
-          0% { opacity: 0.6; }
-          50% { opacity: 1; }
-          100% { opacity: 0.6; }
-        }
-      `}</style>
+      {/* Modular Section 1: Executive Functional Modules */}
+      <section>
+        <div style={{ marginBottom: '24px' }}>
+          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#F8FAFC', margin: '0 0 6px' }}>
+            Serviços & Módulos da Plataforma
+          </h2>
+          <p style={{ fontSize: '1.05rem', color: '#94A3B8', margin: 0 }}>
+            Escolha uma das opções abaixo para acessar ferramentas de localização, diagnóstico e vigilância.
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '24px' }}>
+          
+          {/* Card 1: Mapa Interativo */}
+          <div className="hud-card hud-card-interactive" onClick={() => navigate('/map')}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '14px', backgroundColor: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>
+                🗺️
+              </div>
+              <span style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60A5FA', fontSize: '0.85rem', fontWeight: 800, padding: '4px 12px', borderRadius: '20px' }}>
+                Fronteiras Contíguas
+              </span>
+            </div>
+
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#FFFFFF', margin: '0 0 8px' }}>
+              Mapa Epidemiológico de SP
+            </h3>
+            <p style={{ fontSize: '0.95rem', color: '#94A3B8', margin: '0 0 20px', lineHeight: 1.5 }}>
+              Navegue pelo mapa sem sobreposição das 32 subprefeituras de São Paulo com preenchimento exato de área, níveis de risco e HUD de hospitais dedicados de cada região.
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#3B82F6', fontWeight: 800, fontSize: '1rem' }}>
+              <span>Explorar Mapa Interativo</span>
+              <span>→</span>
+            </div>
+          </div>
+
+          {/* Card 2: Catálogo Geral de Hospitais */}
+          <div className="hud-card hud-card-interactive" onClick={() => navigate('/map/facilities')}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '14px', backgroundColor: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>
+                🏥
+              </div>
+              <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34D399', fontSize: '0.85rem', fontWeight: 800, padding: '4px 12px', borderRadius: '20px' }}>
+                45+ Hospitais de SP
+              </span>
+            </div>
+
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#FFFFFF', margin: '0 0 8px' }}>
+              Rede Completa de Hospitais
+            </h3>
+            <p style={{ fontSize: '0.95rem', color: '#94A3B8', margin: '0 0 20px', lineHeight: 1.5 }}>
+              Diretório geral de hospitais públicos (SUS) e privados em todas as 5 macrorregiões da capital, com busca por especialidade, plantão 24h, rotas no Google Maps e ligação telefônica.
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10B981', fontWeight: 800, fontSize: '1rem' }}>
+              <span>Acessar Guia de Hospitais</span>
+              <span>→</span>
+            </div>
+          </div>
+
+          {/* Card 3: Avaliação de Região */}
+          <div className="hud-card hud-card-interactive" onClick={() => navigate('/form/evaluation')}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '14px', backgroundColor: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>
+                📝
+              </div>
+              <span style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#FCD34D', fontSize: '0.85rem', fontWeight: 800, padding: '4px 12px', borderRadius: '20px' }}>
+                Vigilância Cidadã
+              </span>
+            </div>
+
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#FFFFFF', margin: '0 0 8px' }}>
+              Avaliação Sanitária de Região
+            </h3>
+            <p style={{ fontSize: '0.95rem', color: '#94A3B8', margin: '0 0 20px', lineHeight: 1.5 }}>
+              Contribua com dados da sua região informando a limpeza urbana, focos de mosquitos da Dengue, qualidade do ar e atendimento nos postos de saúde.
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#F59E0B', fontWeight: 800, fontSize: '1rem' }}>
+              <span>Fazer Avaliação de Bairro</span>
+              <span>→</span>
+            </div>
+          </div>
+
+          {/* Card 4: Predisposição Individual */}
+          <div className="hud-card hud-card-interactive" onClick={() => navigate('/form/predisposition')}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '14px', backgroundColor: 'rgba(168, 85, 247, 0.15)', border: '1px solid rgba(168, 85, 247, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>
+                🩺
+              </div>
+              <span style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#C084FC', fontSize: '0.85rem', fontWeight: 800, padding: '4px 12px', borderRadius: '20px' }}>
+                Saúde Preventiva
+              </span>
+            </div>
+
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#FFFFFF', margin: '0 0 8px' }}>
+              Análise de Predisposição
+            </h3>
+            <p style={{ fontSize: '0.95rem', color: '#94A3B8', margin: '0 0 20px', lineHeight: 1.5 }}>
+              Calcule seus fatores de vulnerabilidade cardiovascular, respiratória e metabólica cruzando hábitos individuais com os índices da sua subprefeitura.
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#A855F7', fontWeight: 800, fontSize: '1rem' }}>
+              <span>Calcular Indicadores</span>
+              <span>→</span>
+            </div>
+          </div>
+
+          {/* Card 5: Missão Agente de Saúde */}
+          <div className="hud-card hud-card-interactive" onClick={() => navigate('/game')}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '14px', backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>
+                🎮
+              </div>
+              <span style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#F87171', fontSize: '0.85rem', fontWeight: 800, padding: '4px 12px', borderRadius: '20px' }}>
+                Capacitação
+              </span>
+            </div>
+
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#FFFFFF', margin: '0 0 8px' }}>
+              Missão Agente Comunitário
+            </h3>
+            <p style={{ fontSize: '0.95rem', color: '#94A3B8', margin: '0 0 20px', lineHeight: 1.5 }}>
+              Teste seus conhecimentos em saúde pública de São Paulo com questões interativas, cronômetro de prova e obtenção de certificado do agente.
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#EF4444', fontWeight: 800, fontSize: '1rem' }}>
+              <span>Iniciar Desafio do Agente</span>
+              <span>→</span>
+            </div>
+          </div>
+
+          {/* Card 6: Feedback & Suporte */}
+          <div className="hud-card hud-card-interactive" onClick={() => navigate('/profile')}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '14px', backgroundColor: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>
+                💬
+              </div>
+              <span style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60A5FA', fontSize: '0.85rem', fontWeight: 800, padding: '4px 12px', borderRadius: '20px' }}>
+                Participação
+              </span>
+            </div>
+
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#FFFFFF', margin: '0 0 8px' }}>
+              Feedback & Suporte Técnico
+            </h3>
+            <p style={{ fontSize: '0.95rem', color: '#94A3B8', margin: '0 0 20px', lineHeight: 1.5 }}>
+              Envie sugestões de novas funções ou reporte inconsistências de dados sanitários diretamente para a equipe técnica de desenvolvimento.
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#3B82F6', fontWeight: 800, fontSize: '1rem' }}>
+              <span>Enviar Feedback</span>
+              <span>→</span>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* Modular Section 2: Quick District Overview Inspector */}
+      <section className="hud-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#FFFFFF', margin: '0 0 4px' }}>
+              Monitor Rápido de Subprefeituras
+            </h2>
+            <p style={{ fontSize: '0.95rem', color: '#94A3B8', margin: 0 }}>
+              Consulte as condições epidemiológicas instantâneas de qualquer região da cidade.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <label style={{ fontSize: '0.9rem', color: '#94A3B8', fontWeight: 700 }}>Selecionar Região:</label>
+            <select
+              value={selectedQuickRegion.id}
+              onChange={(e) => {
+                const found = ALL_SP_DISTRICTS.find(d => d.id === Number(e.target.value));
+                if (found) setSelectedQuickRegion(found);
+              }}
+              style={{
+                backgroundColor: '#1E293B',
+                color: '#FFFFFF',
+                border: '1px solid #334155',
+                borderRadius: '10px',
+                padding: '10px 16px',
+                fontSize: '0.95rem',
+                fontWeight: 700,
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              {ALL_SP_DISTRICTS.map(d => (
+                <option key={d.id} value={d.id}>
+                  {d.name} ({d.zone}) — Subprefeitura {d.subprefeitura}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Selected Region Detailed Card */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', backgroundColor: '#070B14', padding: '24px', borderRadius: '16px', border: '1px solid #1E293B' }}>
+          <div>
+            <span style={{ fontSize: '0.8rem', color: '#3B82F6', fontWeight: 800, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+              {selectedQuickRegion.zone}
+            </span>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#FFFFFF', margin: '0 0 8px' }}>
+              {selectedQuickRegion.name}
+            </h3>
+            <p style={{ fontSize: '0.95rem', color: '#94A3B8', margin: 0 }}>
+              População estimada: <strong>{Number(selectedQuickRegion.population).toLocaleString()} habitantes</strong>
+            </p>
+          </div>
+
+          <div>
+            <span style={{ fontSize: '0.8rem', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+              Nível de Risco Sanitário
+            </span>
+            <span className={`badge-risk badge-risk-${selectedQuickRegion.risk.toLowerCase().replace('é', 'e')}`}>
+              ● Risco {selectedQuickRegion.risk}
+            </span>
+            <p style={{ fontSize: '0.85rem', color: '#CBD5E1', margin: '8px 0 0' }}>
+              Foco principal: <strong>{selectedQuickRegion.disease}</strong>
+            </p>
+          </div>
+
+          <div>
+            <span style={{ fontSize: '0.8rem', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+              Indicadores Ambientais
+            </span>
+            <div style={{ display: 'flex', gap: '16px', marginTop: '6px' }}>
+              <div>
+                <span style={{ fontSize: '0.75rem', color: '#64748B', display: 'block' }}>Qualidade do Ar</span>
+                <strong style={{ fontSize: '1.1rem', color: '#F8FAFC' }}>{selectedQuickRegion.aqi} AQI</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.75rem', color: '#64748B', display: 'block' }}>Casos 14d</span>
+                <strong style={{ fontSize: '1.1rem', color: '#EF4444' }}>{selectedQuickRegion.cases}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.75rem', color: '#64748B', display: 'block' }}>Limpeza</span>
+                <strong style={{ fontSize: '1.1rem', color: '#10B981' }}>{selectedQuickRegion.cleanliness}/5 ⭐</strong>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button
+              onClick={() => navigate('/map')}
+              className="btn-primary"
+              style={{ width: '100%', padding: '12px 20px', fontSize: '0.95rem' }}
+            >
+              🗺️ Ver {selectedQuickRegion.name} no Mapa
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Modular Section 3: Live Epidemiological News */}
+      <section>
+        <div style={{ marginBottom: '20px' }}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#F8FAFC', margin: '0 0 4px' }}>
+            Alertas & Notícias da Saúde de São Paulo
+          </h2>
+          <p style={{ fontSize: '1rem', color: '#94A3B8', margin: 0 }}>
+            Informativos oficiais do Ministério da Saúde, Secretaria Municipal e CETESB.
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px' }}>
+          
+          <article className="hud-card" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#34D399', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '4px 10px', borderRadius: '6px' }}>
+                IMUNIZAÇÃO SUS
+              </span>
+              <span style={{ fontSize: '0.8rem', color: '#64748B' }}>Hoje, 11:00</span>
+            </div>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+              Campanha contra Influenza e Dengue ampliada em todas as UBSs de SP
+            </h3>
+            <p style={{ fontSize: '0.95rem', color: '#94A3B8', margin: 0, lineHeight: 1.5 }}>
+              Todas as 32 subprefeituras de São Paulo contam com postos abertos aos finais de semana para atendimento e aplicação de vacinas.
+            </p>
+          </article>
+
+          <article className="hud-card" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#F87171', backgroundColor: 'rgba(239, 68, 68, 0.15)', padding: '4px 10px', borderRadius: '6px' }}>
+                VIGILÂNCIA EPIDEMIOLÓGICA
+              </span>
+              <span style={{ fontSize: '0.8rem', color: '#64748B' }}>Ontem, 16:30</span>
+            </div>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+              Monitoramento aponta desaceleração gradual de arboviroses na capital
+            </h3>
+            <p style={{ fontSize: '0.95rem', color: '#94A3B8', margin: 0, lineHeight: 1.5 }}>
+              {temporalData ? temporalData.sintese_automatica.destaque_variacao_recente : 'Ações intensivas com aplicação de biolarvicidas e orientações preventivas nos bairros prioritários.'}
+            </p>
+          </article>
+
+          <article className="hud-card" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#FCD34D', backgroundColor: 'rgba(245, 158, 11, 0.15)', padding: '4px 10px', borderRadius: '6px' }}>
+                MONITORAMENTO DO AR
+              </span>
+              <span style={{ fontSize: '0.8rem', color: '#64748B' }}>Hoje, 09:15</span>
+            </div>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+              Qualidade do ar atinge nível favorável após chuvas isoladas na Zona Sul
+            </h3>
+            <p style={{ fontSize: '0.95rem', color: '#94A3B8', margin: 0, lineHeight: 1.5 }}>
+              Estações da Vila Mariana, Moema e Santo Amaro registram índice AQI de 41. Excelente período para atividades físicas ao ar livre.
+            </p>
+          </article>
+
+        </div>
+      </section>
+
     </div>
   );
 }
-
-const fallbackNews: NewsItem[] = [
-  {
-    id: 1,
-    category: 'Vacinação',
-    category_color: '#34C759',
-    title: 'Campanha de Vacinação contra Influenza é ampliada em todos os postos de SP',
-    summary: 'SMS-SP reforça imunização para todas as idades. Unidades Básicas de Saúde da Sé, Pinheiros e Itaquera abrem aos sábados.',
-    source: 'Secretaria Municipal da Saúde - SP',
-    minutes_ago: 5,
-    read_time: '2 min',
-    impact: 'Alto'
-  },
-  {
-    id: 2,
-    category: 'Arboviroses',
-    category_color: '#FF3B30',
-    title: 'Mutirão de combate à Dengue elimina mais de 1.200 focos no Centro e Zona Leste',
-    summary: 'Agentes de saúde urbana aplicam biolarvicidas e orientam moradores nos bairros da Sé, República e Itaquera.',
-    source: 'Observatório de Saúde Urbana',
-    minutes_ago: 12,
-    read_time: '3 min',
-    impact: 'Crítico'
-  },
-  {
-    id: 3,
-    category: 'Ar & Ambiente',
-    category_color: '#F5A623',
-    title: 'Qualidade do ar atinge nível "Bom" após chuvas isoladas na região sul',
-    summary: 'Estações de monitoramento na Vila Mariana e Moema registram índice AQI de 42. Recomenda-se prática de atividades ao ar livre.',
-    source: 'CETESB / HealthCore.AI',
-    minutes_ago: 18,
-    read_time: '1 min',
-    impact: 'Médio'
-  }
-];

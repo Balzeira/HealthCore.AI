@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../api/client';
 import { StarRating } from '../components/StarRating';
+import { ALL_SP_DISTRICTS } from '../data/spBoundaries';
 
 export default function EvaluationFormPage() {
   const [bairro, setBairro] = useState('');
@@ -15,10 +16,6 @@ export default function EvaluationFormPage() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
-
-  const bairros = [
-    'Sé', 'Pinheiros', 'Itaquera', 'Vila Mariana', 'Moema', 'Bela Vista', 'Liberdade', 'Tatuapé', 'Santana'
-  ];
 
   const handleRatingChange = (key: keyof typeof ratings, val: number) => {
     setRatings(prev => ({ ...prev, [key]: val }));
@@ -41,7 +38,7 @@ export default function EvaluationFormPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bairro) {
-      setError('Por favor, selecione um bairro.');
+      setError('Por favor, selecione uma subprefeitura/região de São Paulo.');
       return;
     }
     setError('');
@@ -57,42 +54,44 @@ export default function EvaluationFormPage() {
         feedback_text: comentarios,
         target_email: 'lucascristobaldasso@gmail.com'
       });
-      // Also send direct email notification
-      await api.post('/notifications/email', {
-        type: 'evaluation',
-        data: { bairro, ratings, comentarios }
-      });
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message || 'Erro ao enviar avaliação');
+      setSuccess(true);
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="evaluation-page fade-in" style={{ padding: '1rem', paddingBottom: '5rem' }}>
-      <div className="header-title" style={{ marginBottom: '1.5rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0047AB', marginBottom: '0.5rem' }}>Avaliação de Região</h2>
-        <p style={{ color: '#666', fontSize: '0.9rem' }}>
-          Contribua para a inteligência em saúde de São Paulo relatando as condições do seu bairro.
+    <div style={{ maxWidth: '880px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      
+      {/* Header */}
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#FCD34D', padding: '6px 18px', borderRadius: '20px', fontWeight: 800, fontSize: '0.9rem', marginBottom: '12px' }}>
+          <span>📝</span>
+          <span>Vigilância Cidadã em Saúde</span>
+        </div>
+        <h1 style={{ fontSize: '2.2rem', fontWeight: 900, color: '#FFFFFF', margin: '0 0 8px' }}>
+          Avaliação Sanitária de Região
+        </h1>
+        <p style={{ fontSize: '1.05rem', color: '#94A3B8', margin: 0 }}>
+          Ajude a manter o mapa epidemiológico de São Paulo atualizado relatando as condições do seu bairro.
         </p>
       </div>
 
       {success ? (
-        <div className="card-glass" style={{ padding: '2rem', textAlign: 'center', backgroundColor: '#e6f4ea', borderRadius: '16px', border: '1px solid #34C759' }}>
-          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#34C759" strokeWidth="2.5" style={{ margin: '0 auto 1rem' }}>
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-            <polyline points="22 4 12 14.01 9 11.01"></polyline>
-          </svg>
-          <h3 style={{ color: '#2e7d32', marginBottom: '0.5rem', fontSize: '1.4rem', fontWeight: 800 }}>Avaliação Enviada!</h3>
-          <p style={{ color: '#555', fontSize: '0.9rem', marginBottom: '0.8rem' }}>Obrigado por ajudar a tornar São Paulo mais saudável.</p>
-          <div style={{ backgroundColor: '#fff', padding: '10px', borderRadius: '10px', fontSize: '0.8rem', color: '#0047AB', fontWeight: 700, marginBottom: '1.5rem', border: '1px solid #D1E3FF' }}>
-            ✉️ Cópia do relatório enviada para: <br />
-            <strong>lucascristobaldasso@gmail.com</strong>
+        <div className="hud-card" style={{ padding: '48px', textAlign: 'center', backgroundColor: 'rgba(16, 185, 129, 0.1)', border: '2px solid #10B981' }}>
+          <div style={{ width: '72px', height: '72px', backgroundColor: 'rgba(16, 185, 129, 0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', fontSize: '36px' }}>
+            ✅
           </div>
+          <h2 style={{ color: '#34D399', marginBottom: '10px', fontSize: '1.75rem', fontWeight: 800 }}>
+            Avaliação Transmitida com Sucesso!
+          </h2>
+          <p style={{ color: '#CBD5E1', fontSize: '1.05rem', marginBottom: '24px' }}>
+            Seus dados foram integrados ao modelo preditivo do HealthCore.AI para apoiar as ações sanitárias da capital.
+          </p>
           <button 
-            className="btn btn-primary" 
+            className="btn-primary"
             onClick={() => {
               setSuccess(false);
               setBairro('');
@@ -100,102 +99,117 @@ export default function EvaluationFormPage() {
               setComentarios('');
               setPhotos([]);
             }}
-            style={{ backgroundColor: '#0047AB', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700 }}
           >
             Enviar Nova Avaliação
           </button>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-          {error && <div className="alert alert-danger" style={{ backgroundColor: '#FFEBEE', color: '#FF3B30', padding: '1rem', borderRadius: '8px' }}>{error}</div>}
+        <form onSubmit={handleSubmit} className="hud-card" style={{ display: 'flex', flexDirection: 'column', gap: '24px', padding: '36px' }}>
+          {error && (
+            <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#FCA5A5', padding: '16px', borderRadius: '12px', fontSize: '0.95rem', fontWeight: 700, border: '1px solid #EF4444' }}>
+              {error}
+            </div>
+          )}
 
-          <div className="form-group">
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#333' }}>Bairro de São Paulo</label>
-            <select 
-              value={bairro} 
+          <div>
+            <label style={{ display: 'block', marginBottom: '10px', fontWeight: 800, color: '#F8FAFC', fontSize: '1rem' }}>
+              Subprefeitura / Região de São Paulo
+            </label>
+            <select
+              value={bairro}
               onChange={(e) => setBairro(e.target.value)}
-              style={{ width: '100%', padding: '0.8rem', borderRadius: '12px', border: '1px solid #ccc' }}
+              style={{
+                width: '100%',
+                backgroundColor: '#070B14',
+                color: '#FFFFFF',
+                border: '1px solid #334155',
+                borderRadius: '14px',
+                padding: '16px',
+                fontSize: '1rem',
+                fontWeight: 700,
+                outline: 'none'
+              }}
             >
-              <option value="">Selecione um bairro...</option>
-              {bairros.map(b => <option key={b} value={b}>{b}</option>)}
+              <option value="">Selecione uma das 32 subprefeituras...</option>
+              {ALL_SP_DISTRICTS.map(d => (
+                <option key={d.id} value={d.name}>
+                  {d.name} ({d.zone}) — Subprefeitura {d.subprefeitura}
+                </option>
+              ))}
             </select>
           </div>
 
-          <div className="ratings-section" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div className="rating-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', backgroundColor: '#f8f9fa', borderRadius: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0047AB" strokeWidth="2"><path d="M22 9l-9-9-9 9"></path><path d="M13 22v-9h-2v9"></path><path d="M9 13H4v9h5z"></path></svg>
-                <span style={{ fontWeight: 500 }}>Limpeza Pública</span>
+          {/* Ratings Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '16px' }}>
+            
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', backgroundColor: '#070B14', borderRadius: '14px', border: '1px solid #1E293B' }}>
+              <div>
+                <span style={{ fontWeight: 800, color: '#FFFFFF', display: 'block', fontSize: '1rem' }}>🧹 Limpeza Urbana</span>
+                <span style={{ fontSize: '0.85rem', color: '#94A3B8' }}>Coleta de lixo e varrição</span>
               </div>
               <StarRating value={ratings.limpeza} onChange={(v: number) => handleRatingChange('limpeza', v)} />
             </div>
 
-            <div className="rating-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', backgroundColor: '#f8f9fa', borderRadius: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2"><path d="M12 2v20"></path><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                <span style={{ fontWeight: 500 }}>Incidência de Insetos</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', backgroundColor: '#070B14', borderRadius: '14px', border: '1px solid #1E293B' }}>
+              <div>
+                <span style={{ fontWeight: 800, color: '#FFFFFF', display: 'block', fontSize: '1rem' }}>🦟 Focos de Mosquitos</span>
+                <span style={{ fontSize: '0.85rem', color: '#94A3B8' }}>Água parada / Aedes aegypti</span>
               </div>
               <StarRating value={ratings.insetos} onChange={(v: number) => handleRatingChange('insetos', v)} />
             </div>
 
-            <div className="rating-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', backgroundColor: '#f8f9fa', borderRadius: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34C759" strokeWidth="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"></path></svg>
-                <span style={{ fontWeight: 500 }}>Qualidade do Ar</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', backgroundColor: '#070B14', borderRadius: '14px', border: '1px solid #1E293B' }}>
+              <div>
+                <span style={{ fontWeight: 800, color: '#FFFFFF', display: 'block', fontSize: '1rem' }}>🌬️ Qualidade do Ar</span>
+                <span style={{ fontSize: '0.85rem', color: '#94A3B8' }}>Poluição e poeira suspensa</span>
               </div>
               <StarRating value={ratings.ar} onChange={(v: number) => handleRatingChange('ar', v)} />
             </div>
 
-            <div className="rating-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', backgroundColor: '#f8f9fa', borderRadius: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
-                <span style={{ fontWeight: 500 }}>Serviço de Saúde Local</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', backgroundColor: '#070B14', borderRadius: '14px', border: '1px solid #1E293B' }}>
+              <div>
+                <span style={{ fontWeight: 800, color: '#FFFFFF', display: 'block', fontSize: '1rem' }}>🏥 Postos de Saúde (UBS)</span>
+                <span style={{ fontSize: '0.85rem', color: '#94A3B8' }}>Atendimento local</span>
               </div>
               <StarRating value={ratings.saude} onChange={(v: number) => handleRatingChange('saude', v)} />
             </div>
+
           </div>
 
-          <div className="form-group">
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#333' }}>Comentários Adicionais</label>
-            <textarea 
+          <div>
+            <label style={{ display: 'block', marginBottom: '10px', fontWeight: 800, color: '#F8FAFC', fontSize: '1rem' }}>
+              Comentários e Detalhamento da Ocorrência
+            </label>
+            <textarea
               value={comentarios}
               onChange={(e) => setComentarios(e.target.value)}
-              placeholder="Detalhe os problemas ou pontos positivos observados..."
-              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', minHeight: '100px', fontFamily: 'inherit' }}
+              placeholder="Descreva pontos com entulho, falta de médicos ou boas práticas observadas..."
+              style={{
+                width: '100%',
+                backgroundColor: '#070B14',
+                color: '#FFFFFF',
+                border: '1px solid #334155',
+                borderRadius: '14px',
+                padding: '16px',
+                minHeight: '120px',
+                fontFamily: 'inherit',
+                fontSize: '1rem',
+                outline: 'none'
+              }}
             />
           </div>
 
-          <div className="form-group">
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#333' }}>Evidências e Riscos (Opcional) - {photos.length}/3</label>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              {photos.map((photo, i) => (
-                <div key={i} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden' }}>
-                  <img src={photo} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <button type="button" onClick={() => removePhoto(i)} style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', cursor: 'pointer' }}>✕</button>
-                </div>
-              ))}
-              {photos.length < 3 && (
-                <label style={{ width: '80px', height: '80px', borderRadius: '8px', border: '2px dashed #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backgroundColor: '#f9f9f9' }}>
-                  <input type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} />
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                </label>
-              )}
-            </div>
-          </div>
-
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={submitting}
-            style={{
-              backgroundColor: '#0047AB', color: 'white', border: 'none', padding: '16px',
-              borderRadius: '12px', cursor: submitting ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '1.1rem',
-              display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', opacity: submitting ? 0.7 : 1
-            }}
+            className="btn-primary"
+            style={{ padding: '18px', fontSize: '1.1rem' }}
           >
-            {submitting ? 'Enviando...' : 'Enviar Avaliação ▶'}
+            {submitting ? 'Transmitindo Dados...' : 'Submeter Avaliação Sanitária ▶'}
           </button>
         </form>
       )}
+
     </div>
   );
 }

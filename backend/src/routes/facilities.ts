@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { Database } from 'sql.js';
+import { fetchSUSCNESEstabelecimentos } from '../services/susService.js';
 
 // Haversine distance in km
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -16,7 +17,7 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 export function facilitiesRouter(db: Database) {
   const router = Router();
 
-  router.get('/', (req: Request, res: Response) => {
+  router.get('/', async (req: Request, res: Response) => {
     try {
       const { lat, lng, radius, region_id, type, is_24h, is_emergency, search } = req.query;
 
@@ -49,11 +50,26 @@ export function facilitiesRouter(db: Database) {
 
       const stmt = db.prepare(sql);
       stmt.bind(params);
-      const facilities = [];
+      const facilities: any[] = [];
       while (stmt.step()) {
         facilities.push(stmt.getAsObject());
       }
       stmt.free();
+
+      // Fetch CNES records to enrich metadata
+      const cnesData = await fetchSUSCNESEstabelecimentos();
+      const enriched = facilities.map(f => {
+        const cnesMatch = cnesData.find(c => 
+          c.nome_fantasia?.toLowerCase().includes(f.name.toLowerCase().slice(0, 8)) ||
+          f.name.toLowerCase().includes(c.nome_fantasia?.toLowerCase().slice(0, 8) || '___')
+        );
+        return {
+          ...f,
+          cnes_code: cnesMatch ? cnesMatch.codigo_cnes : undefined,
+          esfera_administrativa: cnesMatch ? cnesMatch.descricao_esfera_administrativa : undefined,
+          fonte_oficial: 'CNES / Ministério da Saúde (IBGE 355030)'
+        };
+      });
 
       // Filter by distance and add calculated fields if lat/lng are provided
       if (lat && lng) {
@@ -61,24 +77,24 @@ export function facilitiesRouter(db: Database) {
         const userLng = parseFloat(lng as string);
         const maxRadius = radius ? parseFloat(radius as string) : null;
 
-        const withDistances = facilities.map(f => {
+        const withDistances = enriched.map(f => {
           const dist = calculateDistance(userLat, userLng, f.latitude as number, f.longitude as number);
           return {
             ...f,
             distance_km: parseFloat(dist.toFixed(2)),
-            walking_time_mins: Math.max(1, Math.round(dist / 5 * 60)), // Assuming 5km/h walking speed
-            driving_time_mins: Math.max(1, Math.round(dist / 30 * 60)) // Assuming 30km/h driving speed
+            walking_time_mins: Math.max(1, Math.round(dist / 5 * 60)),
+            driving_time_mins: Math.max(1, Math.round(dist / 30 * 60))
           };
         });
 
         const filtered = maxRadius ? withDistances.filter(f => f.distance_km <= maxRadius) : withDistances;
         filtered.sort((a, b) => a.distance_km - b.distance_km);
         
-        res.json({ facilities: filtered });
+        res.json({ facilities: filtered, fonte: 'CNES / Ministério da Saúde' });
         return;
       }
 
-      res.json({ facilities });
+      res.json({ facilities: enriched, fonte: 'CNES / Ministério da Saúde' });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

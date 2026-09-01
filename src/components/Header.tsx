@@ -1,39 +1,162 @@
 import React from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 
 interface HeaderProps {
   showBack?: boolean;
   title?: string;
   onBack?: () => void;
+  user?: { name: string; email: string; role: string; district: string } | null;
+  onLogout?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ showBack, title, onBack }) => {
+export const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
+  const navigate = useNavigate();
+  const navRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollNav = (dir: 'left' | 'right') => {
+    if (navRef.current) {
+      navRef.current.scrollBy({
+        left: dir === 'left' ? -150 : 150,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   return (
-    <header className="header">
-      <div className="header-left">
-        {showBack ? (
-          <button className="header-back" onClick={onBack} aria-label="Voltar">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
-          </button>
-        ) : (
-          <div className="header-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-              <circle cx="12" cy="10" r="3"></circle>
-            </svg>
+    <header className="executive-header">
+      {/* 1. Left Brand Section */}
+      <div className="header-brand-box" onClick={() => navigate('/')}>
+        <div className="header-brand-logo">
+          <span style={{ fontSize: '20px' }}>🏥</span>
+        </div>
+        <div className="header-brand-text">
+          <div className="header-brand-name">
+            HealthCore<span className="brand-dot">.AI</span>
+            <span className="header-badge-sp">SP</span>
           </div>
-        )}
-        <h1 className="header-title">{title || 'HealthCore.AI'}</h1>
+          <span className="header-brand-tag">Observatório da Capital</span>
+        </div>
       </div>
-      <div className="header-right">
-        <button className="header-btn" aria-label="Notificações">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-          </svg>
-          <span className="notification-badge"></span>
+
+      {/* 2. Center Navigation Capsule with Side Arrow Controls */}
+      <div className="header-nav-wrapper">
+        <button 
+          type="button" 
+          className="header-nav-scroll-btn header-nav-scroll-left"
+          onClick={() => scrollNav('left')}
+          title="Rolar menu para esquerda"
+          aria-label="Rolar menu para esquerda"
+        >
+          ‹
         </button>
+
+        <nav className="header-nav-capsule" ref={navRef}>
+          <NavLink 
+            to="/" 
+            end
+            className={({ isActive }) => `header-nav-item ${isActive ? 'active' : ''}`}
+          >
+            <span className="nav-icon">🏠</span>
+            <span className="nav-label">Início</span>
+          </NavLink>
+
+          <NavLink 
+            to="/map" 
+            end
+            className={({ isActive }) => `header-nav-item ${isActive ? 'active' : ''}`}
+          >
+            <span className="nav-icon">🗺️</span>
+            <span className="nav-label">Mapa SP</span>
+          </NavLink>
+
+          <NavLink 
+            to="/map/facilities" 
+            end
+            className={({ isActive }) => `header-nav-item ${isActive ? 'active' : ''}`}
+          >
+            <span className="nav-icon">🏥</span>
+            <span className="nav-label">Hospitais</span>
+          </NavLink>
+
+          <NavLink 
+            to="/form/evaluation" 
+            className={({ isActive }) => `header-nav-item ${isActive ? 'active' : ''}`}
+          >
+            <span className="nav-icon">📝</span>
+            <span className="nav-label">Avaliar Bairro</span>
+          </NavLink>
+
+          <NavLink 
+            to="/form/predisposition" 
+            className={({ isActive }) => `header-nav-item ${isActive ? 'active' : ''}`}
+          >
+            <span className="nav-icon">🩺</span>
+            <span className="nav-label">Predisposição</span>
+          </NavLink>
+
+          <NavLink 
+            to="/game" 
+            className={({ isActive }) => `header-nav-item ${isActive ? 'active' : ''}`}
+          >
+            <span className="nav-icon">🎮</span>
+            <span className="nav-label">Missão Agente</span>
+          </NavLink>
+        </nav>
+
+        <button 
+          type="button" 
+          className="header-nav-scroll-btn header-nav-scroll-right"
+          onClick={() => scrollNav('right')}
+          title="Rolar menu para direita"
+          aria-label="Rolar menu para direita"
+        >
+          ›
+        </button>
+      </div>
+
+      {/* 3. Right Status & User Account Section (100% Visível & Sem Cortes) */}
+      <div className="header-user-section">
+        {/* Compact Live Status Dot */}
+        <div className="header-live-badge-compact" title="32 Subprefeituras de SP Monitoradas em Tempo Real">
+          <span className="header-live-dot"></span>
+          <span>Ao Vivo</span>
+        </div>
+
+        {/* User Account & Logout Control */}
+        {user ? (
+          <div className="header-account-card">
+            <div 
+              className="header-account-info" 
+              onClick={() => navigate('/profile')}
+              title={`Conectado como: ${user.name} (${user.email})`}
+            >
+              <span className="header-user-avatar">👤</span>
+              <div className="header-user-text">
+                <span className="header-user-name">{user.name}</span>
+                <span className="header-user-role">{user.role || 'Cidadão'}</span>
+              </div>
+            </div>
+
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="header-logout-btn"
+                title="Clique para sair do seu login"
+              >
+                <span>Sair</span>
+                <span style={{ fontSize: '12px' }}>⏻</span>
+              </button>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={() => window.location.reload()}
+            className="btn-primary"
+            style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+          >
+            Entrar
+          </button>
+        )}
       </div>
     </header>
   );

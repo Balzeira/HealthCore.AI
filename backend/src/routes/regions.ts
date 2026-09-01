@@ -1,11 +1,26 @@
 import { Router, Request, Response } from 'express';
 import { Database } from 'sql.js';
+import { fetchSUSEpidemiologicalSeries } from '../services/susService.js';
+import { performTemporalAnalysis } from '../services/temporalAnalysis.js';
 
 export function regionsRouter(db: Database) {
   const router = Router();
 
-  router.get('/', (req: Request, res: Response) => {
+  router.get('/', async (req: Request, res: Response) => {
     try {
+      const { start_date, end_date } = req.query;
+
+      // Check for real SUS series
+      const epiSeries = await fetchSUSEpidemiologicalSeries();
+      let temporalSummary: any = null;
+      if (epiSeries && epiSeries.length > 0) {
+        temporalSummary = performTemporalAnalysis(
+          epiSeries,
+          typeof start_date === 'string' ? start_date : undefined,
+          typeof end_date === 'string' ? end_date : undefined
+        );
+      }
+
       const sql = `
         SELECT r.id, r.name, r.risk_level, r.latitude, r.longitude,
                COUNT(e.id) as diseases_tracked,
@@ -21,18 +36,27 @@ export function regionsRouter(db: Database) {
       }
       stmt.free();
 
-      res.json({ regions });
+      res.json({
+        regions,
+        temporal_analysis: temporalSummary ? {
+          periodo: temporalSummary.intervalo_analisado,
+          totais: temporalSummary.totais_periodo,
+          extremos: temporalSummary.extremos,
+          comparacao: temporalSummary.comparacao_periodo_anterior,
+          sintese: temporalSummary.sintese_automatica
+        } : null
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  router.get('/:id/details', (req: Request, res: Response) => {
+  router.get('/:id/details', async (req: Request, res: Response) => {
     try {
       const regionId = parseInt(req.params.id, 10);
       if (isNaN(regionId)) {
-         res.status(400).json({ error: 'Invalid region ID' });
-         return;
+        res.status(400).json({ error: 'Invalid region ID' });
+        return;
       }
 
       const regionStmt = db.prepare('SELECT * FROM regions WHERE id = ?');
@@ -44,8 +68,8 @@ export function regionsRouter(db: Database) {
       regionStmt.free();
 
       if (!region) {
-         res.status(404).json({ error: 'Region not found' });
-         return;
+        res.status(404).json({ error: 'Region not found' });
+        return;
       }
 
       const epiStmt = db.prepare('SELECT * FROM epidemiological_data WHERE region_id = ?');

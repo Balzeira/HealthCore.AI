@@ -1,426 +1,286 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { api } from '../api/client';
-import L from 'leaflet';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-
-// Fix leaflet default marker icons
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
-let DefaultIcon = L.icon({
-  iconUrl: icon,
-  shadowUrl: iconShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-L.Marker.prototype.options.icon = DefaultIcon;
-
-// Custom colored pin markers for Hospital vs UBS
-const createFacilityMarkerIcon = (type: string) => {
-  const isHospital = type === 'Hospital';
-  const bg = isHospital ? '#0047AB' : '#34C759';
-  const symbol = isHospital ? '🏥' : '🩺';
-
-  return L.divIcon({
-    className: 'facility-custom-marker',
-    html: `
-      <div style="
-        background: ${bg};
-        color: white;
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 14px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        border: 2px solid white;
-        cursor: pointer;
-      ">
-        ${symbol}
-      </div>
-    `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
-  });
-};
-
-const FlyToLocation = ({ center }: { center: [number, number] }) => {
-  const map = useMap();
-  useEffect(() => {
-    map.flyTo(center, 14, { duration: 1.0 });
-  }, [center, map]);
-  return null;
-};
+import React, { useState, useMemo } from 'react';
+import { ALL_SP_HOSPITALS, Hospital } from '../data/hospitalsData';
 
 export default function FacilitiesPage() {
-  const navigate = useNavigate();
-  const [facilities, setFacilities] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number }>({ lat: -23.5505, lng: -46.6333 }); // Sé default
-  const [searchRadius, setSearchRadius] = useState<number>(5); // 5km default
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [filterType, setFilterType] = useState<'Todos' | 'Hospital' | 'UBS' | '24h' | 'Emergência'>('Todos');
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // Authoritative catalog of all 56 SP hospitals with verified zones and CNES metadata
+  const [hospitals] = useState<Hospital[]>(ALL_SP_HOSPITALS);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedZone, setSelectedZone] = useState('Todas');
+  const [filterType, setFilterType] = useState<string>('Todos');
 
-  useEffect(() => {
-    // Try to get user geolocation
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-          fetchFacilities(pos.coords.latitude, pos.coords.longitude, searchRadius);
-        },
-        () => {
-          fetchFacilities(userCoords.lat, userCoords.lng, searchRadius);
-        }
-      );
-    } else {
-      fetchFacilities(userCoords.lat, userCoords.lng, searchRadius);
-    }
-  }, [searchRadius]);
-
-  const fetchFacilities = async (lat: number, lng: number, radius: number) => {
-    setLoading(true);
-    try {
-      const data = await api.get<any>(`/facilities?lat=${lat}&lng=${lng}&radius=${radius}`);
-      let list = [];
-      if (data && Array.isArray(data.facilities)) {
-        list = data.facilities;
-      } else if (Array.isArray(data)) {
-        list = data;
-      } else {
-        list = mockFacilities;
-      }
-
-      // Normalize object fields for seamless rendering
-      const normalized = list.map((f: any) => {
-        const latitude = f.latitude ?? f.lat ?? -23.5505;
-        const longitude = f.longitude ?? f.lng ?? -46.6333;
-        const distKm = f.distance_km ?? calculateDistance(lat, lng, latitude, longitude);
-        return {
-          id: f.id,
-          name: f.name || 'Unidade de Saúde',
-          type: f.type || 'UBS',
-          address: f.address || 'São Paulo - SP',
-          phone: f.phone || '(11) 3000-0000',
-          latitude,
-          longitude,
-          distance_km: parseFloat(distKm.toFixed(2)),
-          walking_time_mins: f.walking_time_mins || Math.max(1, Math.round(distKm / 5 * 60)),
-          driving_time_mins: f.driving_time_mins || Math.max(1, Math.round(distKm / 30 * 60)),
-          is_24h: Boolean(f.is_24h || f.is24h),
-          is_emergency: Boolean(f.is_emergency || f.hasEmergency),
-          specialties: f.specialties || f.description || 'Atendimento de Saúde Urbana'
-        };
-      });
-
-      normalized.sort((a: any, b: any) => a.distance_km - b.distance_km);
-      setFacilities(normalized);
-    } catch (err) {
-      console.error("Failed to load facilities", err);
-      setFacilities(mockFacilities);
-    } finally {
-      setLoading(false);
-    }
+  // Helper: strict type matching based on network field
+  const matchesTypeFilter = (h: Hospital, t: string): boolean => {
+    if (t === 'Todos') return true;
+    if (t === '24h') return Boolean(h?.is_24h);
+    if (t === 'Emergência') return Boolean(h?.is_emergency);
+    if (t === 'SUS') return h?.network === 'SUS';
+    if (t === 'Privado') return h?.network === 'Privado';
+    if (t === 'Filantrópico') return h?.network === 'Filantrópico';
+    return true;
   };
 
-  function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  }
+  // Pure reactive memoized filter calculation
+  const filteredHospitals = useMemo(() => {
+    return hospitals.filter(h => {
+      const query = (searchQuery || '').trim().toLowerCase();
+      const name = (h?.name || '').toLowerCase();
+      const specs = (h?.specialties || '').toLowerCase();
+      const district = (h?.district || '').toLowerCase();
+      const address = (h?.address || '').toLowerCase();
+      const zone = (h?.zone || '').trim().toLowerCase();
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
+      const matchesSearch = query === '' ||
+                            name.includes(query) ||
+                            specs.includes(query) ||
+                            district.includes(query) ||
+                            address.includes(query);
 
-  const handleOpenRoute = (f: any) => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${f.latitude},${f.longitude}`;
-    window.open(url, '_blank');
-  };
+      const targetZone = selectedZone.trim().toLowerCase();
+      const matchesZone = selectedZone === 'Todas' || zone === targetZone;
 
-  const handleCall = (phone: string) => {
-    showToast(`Ligando para ${phone}...`);
-    window.location.href = `tel:${phone.replace(/\D/g, '')}`;
-  };
+      const matchesT = matchesTypeFilter(h, filterType);
 
-  // Filter list by user criteria
-  const displayList = facilities.filter(f => {
-    const matchesSearch = f.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          f.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          f.specialties.toLowerCase().includes(searchQuery.toLowerCase());
-
-    let matchesFilter = true;
-    if (filterType === 'Hospital') matchesFilter = f.type === 'Hospital';
-    if (filterType === 'UBS') matchesFilter = f.type === 'UBS';
-    if (filterType === '24h') matchesFilter = f.is_24h === true;
-    if (filterType === 'Emergência') matchesFilter = f.is_emergency === true;
-
-    return matchesSearch && matchesFilter;
-  });
+      return matchesSearch && matchesZone && matchesT;
+    });
+  }, [hospitals, searchQuery, selectedZone, filterType]);
 
   return (
-    <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', maxWidth: '430px', margin: '0 auto', fontFamily: 'Inter, sans-serif', paddingBottom: '5rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
       
-      {/* Toast Banner */}
-      {toastMessage && (
-        <div style={{ position: 'fixed', top: '16px', left: '50%', transform: 'translateX(-50%)', zIndex: 2000, backgroundColor: '#0F172A', color: '#FFF', padding: '12px 18px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 700, boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>
-          {toastMessage}
-        </div>
-      )}
-
-      {/* Header */}
-      <header style={{ backgroundColor: '#fff', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #E2E8F0', position: 'sticky', top: 0, zIndex: 100 }}>
-        <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#0F172A' }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-        </button>
+      {/* Header Banner */}
+      <div style={{ backgroundColor: '#0F172A', padding: '32px 40px', borderRadius: '20px', border: '1px solid #1E293B', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: '#0F172A' }}>Hospitais & UBSs Próximos</h1>
-          <span style={{ fontSize: '11px', color: '#64748B' }}>Busca por Geolocalização e Proximidade</span>
-        </div>
-      </header>
-
-      {/* Interactive Map view of facilities */}
-      <div style={{ height: '210px', width: '100%', position: 'relative' }}>
-        <MapContainer 
-          center={[userCoords.lat, userCoords.lng]} 
-          zoom={14} 
-          style={{ height: '100%', width: '100%' }}
-          zoomControl={false}
-        >
-          <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-          <FlyToLocation center={[userCoords.lat, userCoords.lng]} />
-          
-          {/* User Location Pulse Circle */}
-          <Circle 
-            center={[userCoords.lat, userCoords.lng]} 
-            radius={searchRadius * 1000} 
-            pathOptions={{ color: '#0047AB', fillColor: '#0047AB', fillOpacity: 0.1, weight: 2, dashArray: '4,4' }} 
-          />
-
-          {/* User Pin */}
-          <Marker position={[userCoords.lat, userCoords.lng]}>
-            <Popup>Você está aqui (Centro de Busca)</Popup>
-          </Marker>
-
-          {/* Facility Pins */}
-          {displayList.map(f => (
-            <Marker 
-              key={f.id} 
-              position={[f.latitude, f.longitude]} 
-              icon={createFacilityMarkerIcon(f.type)}
-            >
-              <Popup>
-                <div style={{ minWidth: '150px', fontFamily: 'Inter, sans-serif' }}>
-                  <strong style={{ fontSize: '13px', color: '#0F172A', display: 'block', marginBottom: '4px' }}>{f.name}</strong>
-                  <span style={{ fontSize: '11px', color: '#0047AB', fontWeight: 700 }}>📍 {f.distance_km} km de você</span>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
-        </MapContainer>
-
-        {/* Proximity Radius Slider Overlay */}
-        <div style={{ position: 'absolute', bottom: '12px', left: '12px', right: '12px', zIndex: 1000, backgroundColor: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(10px)', padding: '10px 14px', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.1)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-            <span style={{ fontSize: '12px', color: '#0F172A', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              📍 Raio de Busca: <strong style={{ color: '#0047AB' }}>{searchRadius} km</strong>
-            </span>
-            <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>{displayList.length} Encontrados</span>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34D399', padding: '6px 16px', borderRadius: '20px', fontWeight: 800, fontSize: '0.85rem', marginBottom: '10px' }}>
+            <span>🏥</span>
+            <span>Rede Hospitalar & Prontos-Socorros (CNES / SUS)</span>
           </div>
-          <input 
-            type="range" 
-            min="1" 
-            max="15" 
-            step="1" 
-            value={searchRadius} 
-            onChange={(e) => setSearchRadius(Number(e.target.value))}
-            style={{ width: '100%', accentColor: '#0047AB', cursor: 'pointer' }}
-          />
+          <h1 style={{ fontSize: '2.2rem', fontWeight: 900, color: '#FFFFFF', margin: '0 0 6px', letterSpacing: '-0.5px' }}>
+            Hospitais de São Paulo Capital
+          </h1>
+          <p style={{ fontSize: '1.05rem', color: '#94A3B8', margin: 0 }}>
+            Catálogo completo com {hospitals.length} hospitais e prontos-socorros nas 5 zonas da cidade.
+          </p>
+        </div>
+
+        <div style={{ backgroundColor: '#1E293B', padding: '12px 24px', borderRadius: '14px', border: '1px solid #334155', textAlign: 'center' }}>
+          <span style={{ fontSize: '0.8rem', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', display: 'block' }}>Unidades Listadas</span>
+          <span style={{ fontSize: '1.8rem', fontWeight: 900, color: '#3B82F6' }}>{filteredHospitals.length} de {hospitals.length}</span>
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div style={{ padding: '16px' }}>
+      {/* Search & Filter Controls */}
+      <div className="hud-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         
-        {/* Search Bar */}
-        <div style={{ marginBottom: '12px' }}>
-          <input 
+        {/* Main Search Input */}
+        <div>
+          <input
             type="text"
-            placeholder="Pesquisar por nome, endereço ou especialidade..."
+            placeholder="Pesquise por nome do hospital (ex: Santa Casa, HC, Einstein, Mandaqui), especialidade (ex: Cardiologia, Trauma) ou bairro..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '13px', outline: 'none', backgroundColor: '#FFF', fontWeight: 500 }}
+            style={{
+              width: '100%',
+              backgroundColor: '#070B14',
+              color: '#FFFFFF',
+              border: '1px solid #334155',
+              borderRadius: '14px',
+              padding: '16px 20px',
+              fontSize: '1.05rem',
+              fontWeight: 600,
+              outline: 'none'
+            }}
           />
         </div>
 
-        {/* Filter Pills */}
-        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '14px', scrollbarWidth: 'none' }}>
-          {(['Todos', 'Hospital', 'UBS', '24h', 'Emergência'] as const).map(type => (
-            <button
-              key={type}
-              onClick={() => setFilterType(type)}
-              style={{
-                padding: '6px 14px', borderRadius: '20px', fontSize: '11px', fontWeight: 800, border: 'none',
-                backgroundColor: filterType === type ? '#0047AB' : '#FFF',
-                color: filterType === type ? '#FFF' : '#475569', cursor: 'pointer',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.05)', border: filterType === type ? 'none' : '1px solid #E2E8F0',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {type === 'Todos' ? '🏥 Todos' : type === 'Hospital' ? '🏥 Hospitais' : type === 'UBS' ? '🩺 UBSs' : type === '24h' ? '⏱ Plantão 24h' : '🚨 Emergência'}
-            </button>
-          ))}
+        {/* Filter Pills Row */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          {/* Zone Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase', minWidth: '60px' }}>Zona SP:</span>
+            {['Todas', 'Centro', 'Zona Oeste', 'Zona Sul', 'Zona Leste', 'Zona Norte'].map(z => {
+              const isActive = selectedZone === z;
+              return (
+                <button
+                  key={z}
+                  type="button"
+                  onClick={() => setSelectedZone(z)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '9px 18px',
+                    borderRadius: '12px',
+                    fontSize: '0.95rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    border: isActive ? '2px solid #3B82F6' : '1px solid #334155',
+                    backgroundColor: isActive ? '#1D4ED8' : '#1E293B',
+                    color: isActive ? '#FFFFFF' : '#CBD5E1',
+                    boxShadow: isActive ? '0 0 16px rgba(59, 130, 246, 0.5)' : 'none'
+                  }}
+                >
+                  <span>{isActive ? '✓ ' : ''}{z}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Type Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase', minWidth: '60px' }}>Tipo:</span>
+            {['Todos', '24h', 'Emergência', 'SUS', 'Filantrópico', 'Privado'].map(t => {
+              const isActive = filterType === t;
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setFilterType(t)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '9px 18px',
+                    borderRadius: '12px',
+                    fontSize: '0.95rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    border: isActive ? '2px solid #10B981' : '1px solid #334155',
+                    backgroundColor: isActive ? '#059669' : '#1E293B',
+                    color: isActive ? '#FFFFFF' : '#CBD5E1',
+                    boxShadow: isActive ? '0 0 16px rgba(16, 185, 129, 0.5)' : 'none'
+                  }}
+                >
+                  <span>{isActive ? '✓ ' : ''}{t}</span>
+                </button>
+              );
+            })}
+          </div>
+
         </div>
 
-        {/* Facilities Cards List */}
-        {loading ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: '#64748B' }}>
-            <div style={{ width: '36px', height: '36px', border: '3px solid #0047AB', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }}></div>
-            <p style={{ fontSize: '13px', fontWeight: 600 }}>Calculando unidades mais próximas...</p>
-            <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+        {/* Dynamic Status Indicator Banner */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', backgroundColor: '#070B14', padding: '14px 20px', borderRadius: '12px', border: '1px solid #1E293B' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.95rem' }}>
+            <span style={{ color: '#60A5FA', fontWeight: 800 }}>📍 Filtro Atual:</span>
+            <span style={{ color: '#FFFFFF', fontWeight: 800 }}>
+              Região: <strong style={{ color: '#38BDF8' }}>{selectedZone}</strong> | Tipo: <strong style={{ color: '#34D399' }}>{filterType}</strong>
+              {searchQuery && <span> | Busca: "{searchQuery}"</span>}
+            </span>
           </div>
-        ) : displayList.length === 0 ? (
-          <div style={{ backgroundColor: '#FFF', borderRadius: '16px', padding: '2rem', textAlign: 'center', border: '1px solid #E2E8F0' }}>
-            <p style={{ fontSize: '14px', color: '#64748B', margin: 0, fontWeight: 600 }}>Nenhuma unidade encontrada para este filtro ou raio.</p>
-            <button onClick={() => { setSearchRadius(15); setFilterType('Todos'); setSearchQuery(''); }} style={{ marginTop: '12px', padding: '8px 16px', backgroundColor: '#0047AB', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}>
-              Aumentar Raio para 15km
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ color: '#94A3B8', fontSize: '0.9rem', fontWeight: 700 }}>
+              Mostrando <strong style={{ color: '#FFFFFF' }}>{filteredHospitals.length}</strong> {filteredHospitals.length === 1 ? 'hospital' : 'hospitais'}
+            </span>
+            {(selectedZone !== 'Todas' || filterType !== 'Todos' || searchQuery !== '') && (
+              <button
+                type="button"
+                onClick={() => { setSelectedZone('Todas'); setFilterType('Todos'); setSearchQuery(''); }}
+                style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#F87171', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '8px', padding: '4px 12px', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
+              >
+                ✕ Limpar Filtros
+              </button>
+            )}
+          </div>
+        </div>
+
+      </div>
+
+      {/* Hospitals Grid (Strictly Rendering filteredHospitals) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '20px' }}>
+        {filteredHospitals.length === 0 ? (
+          <div className="hud-card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px' }}>
+            <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '12px' }}>🔍</span>
+            <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#FFFFFF', margin: '0 0 8px' }}>
+              Nenhum hospital encontrado para os filtros selecionados
+            </h3>
+            <p style={{ color: '#94A3B8', margin: '0 0 16px' }}>
+              Tente selecionar outra zona de São Paulo ou limpar o termo de pesquisa.
+            </p>
+            <button
+              type="button"
+              onClick={() => { setSelectedZone('Todas'); setFilterType('Todos'); setSearchQuery(''); }}
+              className="btn-primary"
+            >
+              Exibir Todos os 45+ Hospitais
             </button>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {displayList.map(f => (
-              <div key={f.id} style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.04)', border: '1px solid #E2E8F0' }}>
-                
-                {/* Badges */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
-                  <span style={{ backgroundColor: f.type === 'UBS' ? '#E8F8EE' : '#E8F0FE', color: f.type === 'UBS' ? '#2E7D32' : '#0047AB', padding: '4px 10px', borderRadius: '8px', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase' }}>
-                    {f.type === 'UBS' ? '🩺 UNIDADE BÁSICA (UBS)' : '🏥 HOSPITAL GERAL'}
+          filteredHospitals.map(h => (
+            <div 
+              key={`${h.id}-${h.zone}-${selectedZone}-${filterType}`} 
+              className="hud-card" 
+              style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
+            >
+              <div>
+                {/* Header Badges */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#60A5FA', backgroundColor: 'rgba(59, 130, 246, 0.15)', padding: '4px 10px', borderRadius: '6px' }}>
+                    {h.network || h.type}
                   </span>
-                  
-                  {f.is_24h && (
-                    <span style={{ backgroundColor: '#F1F5F9', color: '#475569', padding: '4px 8px', borderRadius: '8px', fontSize: '10px', fontWeight: 700 }}>
-                      ⏱ Plantão 24h
-                    </span>
-                  )}
-                  
-                  {f.is_emergency && (
-                    <span style={{ backgroundColor: '#FFE5E3', color: '#FF3B30', padding: '4px 8px', borderRadius: '8px', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase' }}>
-                      🚨 EMERGÊNCIA
-                    </span>
-                  )}
+
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {h.is_emergency && (
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#F87171', backgroundColor: 'rgba(239, 68, 68, 0.15)', padding: '4px 8px', borderRadius: '6px' }}>
+                        🚨 Emergência 24h
+                      </span>
+                    )}
+                    {h.is_24h && !h.is_emergency && (
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#34D399', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '4px 8px', borderRadius: '6px' }}>
+                        ⏱ 24 Horas
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                {/* Title & Proximity Metrics */}
-                <h2 style={{ fontSize: '17px', fontWeight: 800, margin: '0 0 4px 0', color: '#0F172A' }}>{f.name}</h2>
-                
-                <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#475569', marginBottom: '10px', fontWeight: 600 }}>
-                  <span style={{ fontWeight: 800, color: '#0047AB', backgroundColor: '#E8F0FE', padding: '2px 8px', borderRadius: '6px' }}>
-                    📍 {f.distance_km} km de você
-                  </span>
-                  <span>🚶 ~{f.walking_time_mins} min a pé</span>
-                  <span>🚗 ~{f.driving_time_mins} min de carro</span>
+                {/* Title & Location */}
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#FFFFFF', margin: '0 0 6px', lineHeight: 1.3 }}>
+                  {h.name}
+                </h3>
+
+                <div style={{ fontSize: '0.9rem', color: '#60A5FA', fontWeight: 700, marginBottom: '12px' }}>
+                  📍 {h.zone || 'São Paulo'} • {h.district || 'Capital'}
                 </div>
 
-                {/* Specialties Description */}
-                <p style={{ fontSize: '12px', color: '#475569', lineHeight: '1.4', margin: '0 0 12px 0' }}>
-                  <strong>Especialidades:</strong> {f.specialties}
+                {/* Specialties */}
+                <p style={{ fontSize: '0.9rem', color: '#CBD5E1', margin: '0 0 12px', lineHeight: 1.5 }}>
+                  <strong style={{ color: '#F8FAFC' }}>Especialidades:</strong> {h.specialties || 'Atendimento Geral'}
                 </p>
 
-                {/* Address & Phone */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px', fontSize: '12px', color: '#64748B' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                    <span>📌</span>
-                    <span>{f.address}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>📞</span>
-                    <span>{f.phone}</span>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button 
-                    onClick={() => handleOpenRoute(f)}
-                    style={{ flex: 1, backgroundColor: '#34C759', color: '#fff', border: 'none', padding: '12px', borderRadius: '10px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', boxShadow: '0 2px 8px rgba(52,199,89,0.25)' }}
-                  >
-                    🗺️ Como chegar (Rota)
-                  </button>
-                  <button 
-                    onClick={() => handleCall(f.phone)}
-                    style={{ flex: 1, backgroundColor: '#FFF', color: '#0047AB', border: '2px solid #0047AB', padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}
-                  >
-                    📞 Ligar
-                  </button>
-                </div>
-
+                {/* Address and Phone */}
+                <p style={{ fontSize: '0.85rem', color: '#94A3B8', margin: '0 0 18px', lineHeight: 1.4 }}>
+                  📌 {h.address || 'São Paulo - SP'}
+                </p>
               </div>
-            ))}
-          </div>
-        )}
 
+              {/* Direct Action Buttons */}
+              <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid #1E293B', paddingTop: '16px' }}>
+                <button
+                  type="button"
+                  onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${h.latitude},${h.longitude}`, '_blank')}
+                  className="btn-emerald"
+                  style={{ flex: 1, padding: '10px 14px', fontSize: '0.9rem' }}
+                >
+                  🗺️ Rota no Maps
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => window.location.href = `tel:${(h.phone || '').replace(/\D/g, '')}`}
+                  className="btn-secondary"
+                  style={{ flex: 1, padding: '10px 14px', fontSize: '0.9rem' }}
+                >
+                  📞 {h.phone || '(11) 156'}
+                </button>
+              </div>
+            </div>
+          ))
+        )}
       </div>
+
     </div>
   );
 }
-
-// Fallback mock facilities if offline
-const mockFacilities = [
-  {
-    id: 1,
-    type: 'Hospital',
-    name: 'Hospital Santa Casa de Misericórdia',
-    address: 'R. Dr. Cesário Mota Júnior, 112 - Vila Buarque',
-    phone: '(11) 2176-7000',
-    latitude: -23.5430,
-    longitude: -46.6508,
-    is_24h: 1,
-    is_emergency: 1,
-    specialties: 'Geral, Traumatologia, Pediatria',
-    distance_km: 0.85,
-    walking_time_mins: 10,
-    driving_time_mins: 2
-  },
-  {
-    id: 2,
-    type: 'UBS',
-    name: 'UBS Sé',
-    address: 'Rua Frederico Alvarenga, 259 - Sé',
-    phone: '(11) 3105-8869',
-    latitude: -23.5510,
-    longitude: -46.6300,
-    is_24h: 0,
-    is_emergency: 0,
-    specialties: 'Clínica Geral, Ginecologia, Pediatria',
-    distance_km: 0.34,
-    walking_time_mins: 4,
-    driving_time_mins: 1
-  },
-  {
-    id: 3,
-    type: 'Hospital',
-    name: 'Hospital das Clínicas (HC)',
-    address: 'Av. Dr. Enéas Carvalho de Aguiar, 255 - Cerqueira César',
-    phone: '(11) 2661-0000',
-    latitude: -23.5567,
-    longitude: -46.6670,
-    is_24h: 1,
-    is_emergency: 1,
-    specialties: 'Alta Complexidade, Cardiologia, Neurologia',
-    distance_km: 3.50,
-    walking_time_mins: 42,
-    driving_time_mins: 7
-  }
-];
