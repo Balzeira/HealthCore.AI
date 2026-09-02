@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { ALL_SP_DISTRICTS } from '../data/spBoundaries';
 import { ALL_SP_HOSPITALS } from '../data/hospitalsData';
+import SearchableDistrictSelect from '../components/SearchableDistrictSelect';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -680,32 +681,15 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <label style={{ fontSize: '0.9rem', color: '#94A3B8', fontWeight: 700 }}>Selecionar Região:</label>
-            <select
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '260px' }}>
+            <label style={{ fontSize: '0.9rem', color: '#94A3B8', fontWeight: 700, whiteSpace: 'nowrap' }}>Selecionar Região:</label>
+            <SearchableDistrictSelect
               value={selectedQuickRegion.id}
-              onChange={(e) => {
-                const found = ALL_SP_DISTRICTS.find(d => d.id === Number(e.target.value));
-                if (found) setSelectedQuickRegion(found);
+              onChange={(_, dist) => {
+                if (dist) setSelectedQuickRegion(dist);
               }}
-              style={{
-                backgroundColor: '#1E293B',
-                color: '#FFFFFF',
-                border: '1px solid #334155',
-                borderRadius: '10px',
-                padding: '10px 16px',
-                fontSize: '0.95rem',
-                fontWeight: 700,
-                outline: 'none',
-                cursor: 'pointer'
-              }}
-            >
-              {ALL_SP_DISTRICTS.map(d => (
-                <option key={d.id} value={d.id}>
-                  {d.name} ({d.zone}) — Subprefeitura {d.subprefeitura}
-                </option>
-              ))}
-            </select>
+              buttonStyle={{ padding: '10px 14px', borderRadius: '10px' }}
+            />
           </div>
         </div>
 

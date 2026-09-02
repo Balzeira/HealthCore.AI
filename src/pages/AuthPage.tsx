@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ALL_SP_DISTRICTS } from '../data/spBoundaries';
+import SearchableDistrictSelect from '../components/SearchableDistrictSelect';
 
 interface AuthPageProps {
   onLoginSuccess: (user: { name: string; email: string; role: string; district: string }) => void;
@@ -491,28 +492,12 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
                 <label style={{ fontSize: '0.85rem', fontWeight: 800, color: '#CBD5E1', display: 'block', marginBottom: '6px' }}>
                   Sua Subprefeitura:
                 </label>
-                <select
+                <SearchableDistrictSelect
                   value={district}
-                  onChange={(e) => setDistrict(e.target.value)}
-                  style={{
-                    width: '100%',
-                    backgroundColor: '#070B14',
-                    color: '#FFFFFF',
-                    border: '1px solid #334155',
-                    borderRadius: '12px',
-                    padding: '12px',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    outline: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {ALL_SP_DISTRICTS.map(d => (
-                    <option key={d.id} value={`${d.name} (${d.zone})`}>
-                      {d.name} ({d.zone})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setDistrict(val)}
+                  popupDirection="up"
+                  buttonStyle={{ padding: '12px', fontSize: '0.85rem' }}
+                />
               </div>
 
               <div>

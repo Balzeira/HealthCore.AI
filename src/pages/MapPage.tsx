@@ -7,6 +7,7 @@ import { api } from '../api/client';
 
 import { ALL_SP_DISTRICTS, SPDistrictRegion } from '../data/spBoundaries';
 import { ALL_SP_HOSPITALS, Hospital } from '../data/hospitalsData';
+import SearchableDistrictSelect from '../components/SearchableDistrictSelect';
 
 // Leaflet default icons fix
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -449,31 +450,17 @@ export default function MapPage() {
             <label style={{ fontSize: '0.85rem', fontWeight: 800, color: '#94A3B8', display: 'block', marginBottom: '8px', textTransform: 'uppercase' }}>
               Selecionar Subprefeitura no Mapa
             </label>
-            <select
+            <SearchableDistrictSelect
               value={selectedDistrict.id}
-              onChange={(e) => {
-                const found = ALL_SP_DISTRICTS.find(d => d.id === Number(e.target.value));
-                if (found) handleSelectDistrict(found);
+              onChange={(_, dist) => {
+                if (dist) handleSelectDistrict(dist);
               }}
-              style={{
-                width: '100%',
+              buttonStyle={{
                 backgroundColor: '#1E293B',
-                color: '#FFFFFF',
-                border: '1px solid #334155',
                 borderRadius: '12px',
-                padding: '12px 16px',
-                fontSize: '1rem',
-                fontWeight: 700,
-                outline: 'none',
-                cursor: 'pointer'
+                padding: '12px 16px'
               }}
-            >
-              {ALL_SP_DISTRICTS.map(d => (
-                <option key={d.id} value={d.id}>
-                  {d.name} ({d.zone}) — Subprefeitura {d.subprefeitura}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           {/* ===== HISTÓRICO DO BAIRRO ===== */}
