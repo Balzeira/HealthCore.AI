@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Polygon, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -92,6 +92,17 @@ const ZONE_CENTERS: Record<string, { center: [number, number]; zoom: number }> =
 
 export default function MapPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const userRegisteredDistrictName = useMemo(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem('healthcore_user') || '{}');
+      return u.district || '';
+    } catch (e) {
+      return '';
+    }
+  }, []);
+
   const [selectedDistrict, setSelectedDistrict] = useState<SPDistrictRegion>(ALL_SP_DISTRICTS[0]); // Sé default
   const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>([-23.5505, -46.6333]);
@@ -108,6 +119,28 @@ export default function MapPage() {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [zoomTrigger, setZoomTrigger] = useState<{ type: 'in' | 'out' | 'recenter'; timestamp: number } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
+
+  // Auto-focus on registered district or query param on initial load
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const districtIdParam = params.get('districtId');
+    if (districtIdParam) {
+      const found = ALL_SP_DISTRICTS.find(d => d.id === Number(districtIdParam));
+      if (found) {
+        handleSelectDistrict(found);
+        return;
+      }
+    }
+    if (userRegisteredDistrictName) {
+      const found = ALL_SP_DISTRICTS.find(d => 
+        userRegisteredDistrictName.toLowerCase().includes(d.name.toLowerCase()) ||
+        d.name.toLowerCase().includes(userRegisteredDistrictName.toLowerCase().split(' ')[0])
+      );
+      if (found) {
+        handleSelectDistrict(found);
+      }
+    }
+  }, [location.search, userRegisteredDistrictName]);
 
   const basemapUrls: Record<string, { url: string; attribution: string }> = {
     dark: {
@@ -394,7 +427,38 @@ export default function MapPage() {
           </div>
 
           {/* Selected Region Detailed Card */}
-          <div style={{ backgroundColor: '#070B14', borderRadius: '16px', padding: '20px', border: `2px solid ${getRiskColor(selectedDistrict.risk)}50` }}>
+          {/* District Details Active HUD Card */}
+          <div style={{
+            backgroundColor: '#070B14',
+            borderRadius: '16px',
+            padding: '20px',
+            border: (userRegisteredDistrictName && (userRegisteredDistrictName.toLowerCase().includes(selectedDistrict.name.toLowerCase()) || selectedDistrict.name.toLowerCase().includes(userRegisteredDistrictName.toLowerCase().split(' ')[0])))
+              ? '2px solid #3B82F6'
+              : `2px solid ${getRiskColor(selectedDistrict.risk)}50`,
+            boxShadow: (userRegisteredDistrictName && (userRegisteredDistrictName.toLowerCase().includes(selectedDistrict.name.toLowerCase()) || selectedDistrict.name.toLowerCase().includes(userRegisteredDistrictName.toLowerCase().split(' ')[0])))
+              ? '0 0 25px rgba(59, 130, 246, 0.3)'
+              : 'none'
+          }}>
+            {/* User Home District Badge */}
+            {userRegisteredDistrictName && (userRegisteredDistrictName.toLowerCase().includes(selectedDistrict.name.toLowerCase()) || selectedDistrict.name.toLowerCase().includes(userRegisteredDistrictName.toLowerCase().split(' ')[0])) && (
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: 'rgba(37, 99, 235, 0.25)',
+                border: '1px solid #3B82F6',
+                color: '#60A5FA',
+                padding: '4px 10px',
+                borderRadius: '8px',
+                fontSize: '0.75rem',
+                fontWeight: 900,
+                marginBottom: '10px'
+              }}>
+                <span>📍</span>
+                <span>SEU BAIRRO CADASTRADO</span>
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#60A5FA', textTransform: 'uppercase' }}>
                 {selectedDistrict.zone} • {selectedDistrict.subprefeitura}
@@ -843,6 +907,12 @@ export default function MapPage() {
             {/* Clean Modern Risk Polygons with Configurable Opacity & Labels */}
             {(mapLayerMode === 'all' || mapLayerMode === 'risk') && filteredDistricts.map(district => {
               const isSelected = selectedDistrict.id === district.id;
+              const isUserRegistered = Boolean(
+                userRegisteredDistrictName && (
+                  userRegisteredDistrictName.toLowerCase().includes(district.name.toLowerCase()) ||
+                  district.name.toLowerCase().includes(userRegisteredDistrictName.toLowerCase().split(' ')[0])
+                )
+              );
               const riskColor = getRiskColor(district.risk);
 
               return (
@@ -850,18 +920,32 @@ export default function MapPage() {
                   key={district.id}
                   positions={district.polygon}
                   pathOptions={{
-                    color: isSelected ? '#38BDF8' : riskColor,
+                    color: isSelected ? '#38BDF8' : isUserRegistered ? '#3B82F6' : riskColor,
                     fillColor: riskColor,
                     fillOpacity: isSelected ? Math.min(1, polygonOpacity + 0.3) : polygonOpacity,
-                    weight: isSelected ? 4 : 2,
-                    dashArray: isSelected ? undefined : '2, 2'
+                    weight: isSelected ? 4 : isUserRegistered ? 3.5 : 2,
+                    dashArray: isSelected ? undefined : isUserRegistered ? '4, 4' : '2, 2'
                   }}
                   eventHandlers={{
                     click: () => handleSelectDistrict(district)
                   }}
                 >
-                  <Tooltip direction="center" permanent={showDistrictLabels} className="custom-district-tooltip">
+                  <Tooltip direction="center" permanent={showDistrictLabels || isUserRegistered} className="custom-district-tooltip">
                     <div style={{ padding: '4px 6px' }}>
+                      {isUserRegistered && (
+                        <div style={{
+                          backgroundColor: '#2563EB',
+                          color: '#FFFFFF',
+                          fontSize: '10px',
+                          fontWeight: 900,
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          display: 'inline-block',
+                          marginBottom: '3px'
+                        }}>
+                          📍 SEU BAIRRO CADASTRADO
+                        </div>
+                      )}
                       <div style={{ fontSize: '13px', fontWeight: 900, color: '#FFFFFF' }}>{district.name}</div>
                       <div style={{ color: '#94A3B8', fontSize: '11px', marginTop: '2px' }}>{district.zone} • Subprefeitura {district.subprefeitura}</div>
                       <div style={{ color: riskColor, fontSize: '12px', fontWeight: 800, marginTop: '4px' }}>

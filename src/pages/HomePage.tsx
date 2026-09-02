@@ -599,7 +599,77 @@ export default function HomePage() {
       </section>
 
       {/* Modular Section 2: Quick District Overview Inspector */}
-      <section className="hud-card">
+      <section className="hud-card" style={{
+        position: 'relative',
+        border: (selectedQuickRegion.name.toLowerCase().includes((JSON.parse(localStorage.getItem('healthcore_user') || '{}').district || '').toLowerCase().split(' ')[0]))
+          ? '2px solid rgba(59, 130, 246, 0.8)' 
+          : '1px solid #334155',
+        boxShadow: (selectedQuickRegion.name.toLowerCase().includes((JSON.parse(localStorage.getItem('healthcore_user') || '{}').district || '').toLowerCase().split(' ')[0]))
+          ? '0 0 30px rgba(37, 99, 235, 0.25)' 
+          : 'none'
+      }}>
+        {/* Registered User Region Notification Ribbon */}
+        {(() => {
+          const userRaw = localStorage.getItem('healthcore_user');
+          if (!userRaw) return null;
+          try {
+            const userObj = JSON.parse(userRaw);
+            const userDist = userObj.district || '';
+            const isCurrent = userDist && selectedQuickRegion.name.toLowerCase().includes(userDist.toLowerCase().split(' ')[0]);
+            return (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: isCurrent ? 'rgba(37, 99, 235, 0.2)' : 'rgba(30, 41, 59, 0.6)',
+                border: isCurrent ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid #334155',
+                borderRadius: '12px',
+                padding: '10px 18px',
+                marginBottom: '18px',
+                fontSize: '0.85rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1.1rem' }}>📍</span>
+                  <span style={{ color: '#94A3B8' }}>Seu Bairro / Região Cadastrada:</span>
+                  <strong style={{ color: '#60A5FA' }}>{userDist || 'São Paulo - Capital'}</strong>
+                </div>
+                {isCurrent ? (
+                  <span style={{
+                    backgroundColor: '#2563EB',
+                    color: '#FFFFFF',
+                    padding: '3px 10px',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    fontWeight: 900
+                  }}>
+                    ★ SEU BAIRRO SELECIONADO
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const found = ALL_SP_DISTRICTS.find(d => userDist.toLowerCase().includes(d.name.toLowerCase()) || d.name.toLowerCase().includes(userDist.toLowerCase().split(' ')[0]));
+                      if (found) setSelectedQuickRegion(found);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: '1px solid #3B82F6',
+                      color: '#60A5FA',
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '0.78rem',
+                      fontWeight: 800
+                    }}
+                  >
+                    Exibir Meu Bairro
+                  </button>
+                )}
+              </div>
+            );
+          } catch(e) { return null; }
+        })()}
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#FFFFFF', margin: '0 0 4px' }}>
@@ -687,9 +757,9 @@ export default function HomePage() {
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <button
-              onClick={() => navigate('/map')}
+              onClick={() => navigate(`/map?districtId=${selectedQuickRegion.id}`)}
               className="btn-primary"
-              style={{ width: '100%', padding: '12px 20px', fontSize: '0.95rem' }}
+              style={{ width: '100%', padding: '12px 20px', fontSize: '0.95rem', borderRadius: '10px' }}
             >
               🗺️ Ver {selectedQuickRegion.name} no Mapa
             </button>
