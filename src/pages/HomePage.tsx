@@ -75,28 +75,76 @@ export default function HomePage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '36px' }}>
       
-      {/* Hero Welcome Banner */}
+      {/* Hero Welcome Banner - Executive Redesign */}
       <section style={{
-        background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%)',
-        border: '1px solid #334155',
+        background: 'radial-gradient(ellipse at 85% 20%, rgba(37, 99, 235, 0.18) 0%, transparent 60%), radial-gradient(ellipse at 15% 85%, rgba(16, 185, 129, 0.1) 0%, transparent 60%), #0A0F1D',
+        border: '1px solid rgba(51, 65, 85, 0.85)',
         borderRadius: '24px',
-        padding: '40px 48px',
-        boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
+        padding: '44px 50px',
+        boxShadow: '0 25px 60px rgba(0, 0, 0, 0.65), 0 0 30px rgba(37, 99, 235, 0.15)',
         position: 'relative',
         overflow: 'hidden'
       }}>
-        <div style={{ position: 'relative', zIndex: 2, maxWidth: '960px' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.4)', padding: '8px 18px', borderRadius: '30px', color: '#60A5FA', fontWeight: 800, fontSize: '0.9rem', marginBottom: '16px' }}>
-            <span>🏙️</span>
-            <span>Sistema Integrado de Saúde da Capital Paulista • Dados Oficiais do SUS</span>
+        {/* Decorative Grid Pattern */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px)',
+          backgroundSize: '36px 36px',
+          pointerEvents: 'none',
+          opacity: 0.7
+        }} />
+
+        <div style={{ position: 'relative', zIndex: 2, maxWidth: '980px' }}>
+          {/* Live Official Tag */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '10px',
+            backgroundColor: 'rgba(37, 99, 235, 0.12)',
+            border: '1px solid rgba(59, 130, 246, 0.35)',
+            padding: '8px 18px',
+            borderRadius: '100px',
+            color: '#60A5FA',
+            fontWeight: 800,
+            fontSize: '0.85rem',
+            marginBottom: '20px',
+            boxShadow: '0 0 16px rgba(59, 130, 246, 0.2)'
+          }}>
+            <span style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: '#10B981',
+              boxShadow: '0 0 8px #10B981',
+              display: 'inline-block'
+            }} />
+            <span>Sistema Integrado de Saúde da Capital Paulista · Dados Oficiais do SUS</span>
           </div>
 
-          <h1 style={{ fontSize: '2.5rem', fontWeight: 900, color: '#FFFFFF', margin: '0 0 12px', lineHeight: 1.2, letterSpacing: '-0.5px' }}>
-            Observatório Epidemiológico & Rede Hospitalar de São Paulo
+          <h1 style={{
+            fontSize: '2.6rem',
+            fontWeight: 900,
+            color: '#FFFFFF',
+            margin: '0 0 14px',
+            lineHeight: 1.2,
+            letterSpacing: '-0.8px'
+          }}>
+            Observatório Epidemiológico &amp; Rede Hospitalar <span style={{
+              background: 'linear-gradient(90deg, #60A5FA, #38BDF8)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>de São Paulo</span>
           </h1>
 
-          <p style={{ fontSize: '1.15rem', color: '#94A3B8', margin: '0 0 28px', lineHeight: 1.6 }}>
-            Monitoramento contínuo das 32 subprefeituras da capital com dados públicos e oficiais do <strong>Ministério da Saúde / SUS / CNES</strong>, catalogação completa da rede hospitalar e inteligência epidemiológica com análise histórica por períodos.
+          <p style={{
+            fontSize: '1.12rem',
+            color: '#94A3B8',
+            margin: '0 0 32px',
+            lineHeight: 1.65,
+            maxWidth: '900px'
+          }}>
+            Monitoramento contínuo das 32 subprefeituras e 96 distritos da capital com dados públicos e oficiais do <strong style={{ color: '#F1F5F9' }}>Ministério da Saúde / SUS / CNES</strong>, catalogação completa da rede hospitalar e inteligência epidemiológica com análise histórica por períodos.
           </p>
 
           {/* Primary Action Buttons */}
@@ -104,58 +152,116 @@ export default function HomePage() {
             <button 
               onClick={() => navigate('/map')} 
               className="btn-primary"
-              style={{ fontSize: '1.1rem', padding: '16px 32px' }}
+              style={{
+                fontSize: '1.05rem',
+                padding: '15px 30px',
+                borderRadius: '14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '10px',
+                boxShadow: '0 10px 25px rgba(37, 99, 235, 0.45)'
+              }}
             >
-              <span>🗺️</span>
+              <span style={{ fontSize: '1.2rem' }}>🗺️</span>
               <span>Abrir Mapa Geográfico de SP</span>
             </button>
 
             <button 
               onClick={() => navigate('/map/facilities')} 
               className="btn-secondary"
-              style={{ fontSize: '1.1rem', padding: '16px 32px' }}
+              style={{
+                fontSize: '1.05rem',
+                padding: '15px 30px',
+                borderRadius: '14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '10px',
+                backgroundColor: 'rgba(30, 41, 59, 0.8)',
+                border: '1px solid #334155'
+              }}
             >
-              <span>🏥</span>
-              <span>Consultar Todos os Hospitais (45+)</span>
+              <span style={{ fontSize: '1.2rem' }}>🏥</span>
+              <span>Consultar Todos os Hospitais ({ALL_SP_HOSPITALS.length}+)</span>
             </button>
           </div>
         </div>
 
-        {/* Live Macro Metrics Ticker with Real SUS Data */}
-        <div style={{ marginTop: '36px', paddingTop: '28px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
-          <div>
-            <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+        {/* Live Macro Metrics Grid Cards */}
+        <div style={{
+          marginTop: '36px',
+          paddingTop: '28px',
+          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+          gap: '14px',
+          position: 'relative',
+          zIndex: 2
+        }}>
+          <div style={{
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            padding: '16px 20px',
+            borderRadius: '14px',
+            border: '1px solid rgba(51, 65, 85, 0.6)'
+          }}>
+            <span style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>
               Subprefeituras Monitoradas
             </span>
-            <span style={{ fontSize: '1.8rem', fontWeight: 900, color: '#F8FAFC' }}>
+            <span style={{ fontSize: '1.7rem', fontWeight: 900, color: '#F8FAFC', letterSpacing: '-0.5px' }}>
               32 Regiões
             </span>
+            <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 600, display: 'block', marginTop: '2px' }}>
+              96 Distritos Oficiais
+            </span>
           </div>
 
-          <div>
-            <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+          <div style={{
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            padding: '16px 20px',
+            borderRadius: '14px',
+            border: '1px solid rgba(51, 65, 85, 0.6)'
+          }}>
+            <span style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>
               Casos Reais SUS (Notificados)
             </span>
-            <span style={{ fontSize: '1.8rem', fontWeight: 900, color: '#EF4444' }}>
+            <span style={{ fontSize: '1.7rem', fontWeight: 900, color: '#EF4444', letterSpacing: '-0.5px' }}>
               {Number(totalCasesDisplay).toLocaleString('pt-BR')}
             </span>
+            <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 600, display: 'block', marginTop: '2px' }}>
+              Série Histórica Oficial
+            </span>
           </div>
 
-          <div>
-            <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+          <div style={{
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            padding: '16px 20px',
+            borderRadius: '14px',
+            border: '1px solid rgba(51, 65, 85, 0.6)'
+          }}>
+            <span style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>
               Hospitais Mapeados (CNES)
             </span>
-            <span style={{ fontSize: '1.8rem', fontWeight: 900, color: '#3B82F6' }}>
-              45+ Unidades
+            <span style={{ fontSize: '1.7rem', fontWeight: 900, color: '#3B82F6', letterSpacing: '-0.5px' }}>
+              {ALL_SP_HOSPITALS.length}+ Unidades
+            </span>
+            <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 600, display: 'block', marginTop: '2px' }}>
+              Hospitais, UPAs &amp; PSMs
             </span>
           </div>
 
-          <div>
-            <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+          <div style={{
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            padding: '16px 20px',
+            borderRadius: '14px',
+            border: '1px solid rgba(51, 65, 85, 0.6)'
+          }}>
+            <span style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>
               Fonte Oficial Integrada
             </span>
-            <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#10B981', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '1.45rem', fontWeight: 900, color: '#10B981', display: 'flex', alignItems: 'center', gap: '6px', letterSpacing: '-0.5px' }}>
               <span>✓ SUS / MS</span>
+            </span>
+            <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 600, display: 'block', marginTop: '2px' }}>
+              DataSUS &amp; CNES Ativos
             </span>
           </div>
         </div>

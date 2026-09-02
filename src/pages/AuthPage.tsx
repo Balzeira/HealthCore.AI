@@ -14,8 +14,91 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
   const [role, setRole] = useState<string>('Cidadão');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
+  const [loginProgress, setLoginProgress] = useState<number>(0);
+  const [loginStageText, setLoginStageText] = useState<string>('Autenticando credenciais...');
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const startLoginTransition = (userObj: { name: string; email: string; role: string; district: string }) => {
+    setIsLoggingIn(true);
+    setLoginProgress(10);
+    setLoginStageText('Autenticando credenciais no portal SUS...');
+
+    const interval = setInterval(() => {
+      setLoginProgress(p => {
+        if (p >= 95) {
+          clearInterval(interval);
+          return 100;
+        }
+        if (p > 60) {
+          setLoginStageText('Carregando Observatório Epidemiológico de SP...');
+        } else if (p > 30) {
+          setLoginStageText('Sincronizando 96 Distritos e Rede Hospitalar (CNES)...');
+        }
+        return p + 6;
+      });
+    }, 80);
+
+    setTimeout(() => {
+      clearInterval(interval);
+      setLoginProgress(100);
+      setTimeout(() => {
+        localStorage.setItem('healthcore_user', JSON.stringify(userObj));
+        onLoginSuccess(userObj);
+      }, 400);
+    }, 1700);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+
+    if (isRegisterMode) {
+      if (!name.trim() || !email.trim() || !password.trim()) {
+        setErrorMsg('Por favor, preencha todos os campos obrigatórios.');
+        return;
+      }
+      const newUser = {
+        name: name.trim(),
+        email: email.trim(),
+        role,
+        district
+      };
+      startLoginTransition(newUser);
+    } else {
+      if (!email.trim() || !password.trim()) {
+        setErrorMsg('Informe seu e-mail e senha para continuar.');
+        return;
+      }
+      const existingRaw = localStorage.getItem('healthcore_user');
+      let loggedUser = {
+        name: email.split('@')[0],
+        email: email.trim(),
+        role: 'Cidadão Conectado',
+        district: 'São Paulo - Capital'
+      };
+      if (existingRaw) {
+        try {
+          const parsed = JSON.parse(existingRaw);
+          if (parsed.email === email.trim()) {
+            loggedUser = parsed;
+          }
+        } catch (e) {}
+      }
+      startLoginTransition(loggedUser);
+    }
+  };
+
+  const handleGuestAccess = () => {
+    const guestUser = {
+      name: 'Visitante São Paulo',
+      email: 'visitante@healthcore.sp.gov.br',
+      role: 'Acesso Cidadão',
+      district: 'Sé (Centro)'
+    };
+    startLoginTransition(guestUser);
+  };
 
   // Background animated particle network canvas
   useEffect(() => {
@@ -99,66 +182,6 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
     };
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg('');
-    setIsLoading(true);
-
-    setTimeout(() => {
-      if (isRegisterMode) {
-        if (!name.trim() || !email.trim() || !password.trim()) {
-          setErrorMsg('Por favor, preencha todos os campos obrigatórios.');
-          setIsLoading(false);
-          return;
-        }
-        const newUser = {
-          name: name.trim(),
-          email: email.trim(),
-          role,
-          district
-        };
-        localStorage.setItem('healthcore_user', JSON.stringify(newUser));
-        onLoginSuccess(newUser);
-      } else {
-        if (!email.trim() || !password.trim()) {
-          setErrorMsg('Informe seu e-mail e senha para continuar.');
-          setIsLoading(false);
-          return;
-        }
-        // Auto-authenticate or retrieve existing user
-        const existingRaw = localStorage.getItem('healthcore_user');
-        let loggedUser = {
-          name: email.split('@')[0],
-          email: email.trim(),
-          role: 'Cidadão Conectado',
-          district: 'São Paulo - Capital'
-        };
-        if (existingRaw) {
-          try {
-            const parsed = JSON.parse(existingRaw);
-            if (parsed.email === email.trim()) {
-              loggedUser = parsed;
-            }
-          } catch (e) {}
-        }
-        localStorage.setItem('healthcore_user', JSON.stringify(loggedUser));
-        onLoginSuccess(loggedUser);
-      }
-      setIsLoading(false);
-    }, 600);
-  };
-
-  const handleGuestAccess = () => {
-    const guestUser = {
-      name: 'Visitante São Paulo',
-      email: 'visitante@healthcore.sp.gov.br',
-      role: 'Acesso Cidadão',
-      district: 'Sé (Centro)'
-    };
-    localStorage.setItem('healthcore_user', JSON.stringify(guestUser));
-    onLoginSuccess(guestUser);
-  };
-
   return (
     <div style={{
       position: 'relative',
@@ -171,6 +194,94 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
       overflow: 'hidden',
       padding: '24px'
     }}>
+      
+      {/* ── High-Tech Authenticating Loading Screen ── */}
+      {isLoggingIn && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 99999,
+          backgroundColor: '#060A14',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '28px',
+          animation: 'fadeIn 0.3s ease'
+        }}>
+          {/* Ambient Glow */}
+          <div style={{
+            position: 'absolute',
+            width: '500px',
+            height: '500px',
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(37, 99, 235, 0.25) 0%, transparent 70%)',
+            pointerEvents: 'none'
+          }} />
+
+          {/* Logo & Ring */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              position: 'absolute',
+              width: '150px',
+              height: '150px',
+              borderRadius: '50%',
+              border: '2px solid rgba(59, 130, 246, 0.35)',
+              boxShadow: '0 0 35px rgba(59, 130, 246, 0.4), inset 0 0 25px rgba(59, 130, 246, 0.1)',
+              animation: 'spin 6s linear infinite'
+            }} />
+            <img
+              src="/assets/mockups/03_logo_healthcore.png"
+              alt="HealthCore Logo"
+              style={{
+                width: '115px',
+                height: '115px',
+                objectFit: 'contain',
+                borderRadius: '24px',
+                filter: 'drop-shadow(0 0 25px rgba(59, 130, 246, 0.6))',
+                position: 'relative',
+                zIndex: 2
+              }}
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+          </div>
+
+          {/* Brand Titles */}
+          <div style={{ textAlign: 'center', zIndex: 2 }}>
+            <div style={{ fontSize: '2rem', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.5px' }}>
+              HealthCore<span style={{ color: '#3B82F6' }}>.AI</span>
+            </div>
+            <div style={{ fontSize: '0.9rem', color: '#94A3B8', fontWeight: 700, marginTop: '4px' }}>
+              {loginStageText}
+            </div>
+          </div>
+
+          {/* Progress Bar Container */}
+          <div style={{ width: '320px', maxWidth: '85vw', display: 'flex', flexDirection: 'column', gap: '8px', zIndex: 2 }}>
+            <div style={{
+              width: '100%',
+              height: '6px',
+              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+              borderRadius: '100px',
+              overflow: 'hidden',
+              padding: '1px'
+            }}>
+              <div style={{
+                height: '100%',
+                width: `${loginProgress}%`,
+                background: 'linear-gradient(90deg, #2563EB, #3B82F6, #60A5FA)',
+                borderRadius: '100px',
+                transition: 'width 0.1s ease-out',
+                boxShadow: '0 0 14px rgba(59, 130, 246, 0.9)'
+              }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#64748B', fontWeight: 700 }}>
+              <span>Conectando ao SUS</span>
+              <span style={{ color: '#60A5FA' }}>{loginProgress}%</span>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Background Ambient High-Tech Canvas Animation */}
       <canvas
