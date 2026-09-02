@@ -55,28 +55,11 @@ const createDarkHospitalMarkerIcon = (hospital: Hospital, isSelected: boolean, i
   });
 };
 
-const MapController = ({ 
-  center, 
-  zoom, 
-  zoomTrigger 
-}: { 
-  center: [number, number]; 
-  zoom: number; 
-  zoomTrigger?: { type: 'in' | 'out' | 'recenter'; timestamp: number } | null 
-}) => {
+const MapFlyTo = ({ center, zoom }: { center: [number, number]; zoom: number }) => {
   const map = useMap();
-
   useEffect(() => {
     map.flyTo(center, zoom, { duration: 1.0 });
   }, [center, zoom, map]);
-
-  useEffect(() => {
-    if (!zoomTrigger) return;
-    if (zoomTrigger.type === 'in') map.zoomIn();
-    if (zoomTrigger.type === 'out') map.zoomOut();
-    if (zoomTrigger.type === 'recenter') map.flyTo([-23.5505, -46.6333], 11, { duration: 1.0 });
-  }, [zoomTrigger, map]);
-
   return null;
 };
 
@@ -87,7 +70,7 @@ const ZONE_CENTERS: Record<string, { center: [number, number]; zoom: number }> =
   'Zona Sul': { center: [-23.6400, -46.6800], zoom: 11 },
   'Zona Leste': { center: [-23.5400, -46.4900], zoom: 11 },
   'Zona Norte': { center: [-23.4800, -46.6300], zoom: 12 },
-  'Todas': { center: [-23.5505, -46.6333], zoom: 11 }
+  'Todas': { center: [-23.5505, -46.6333], zoom: 12 }
 };
 
 export default function MapPage() {
@@ -95,38 +78,12 @@ export default function MapPage() {
   const [selectedDistrict, setSelectedDistrict] = useState<SPDistrictRegion>(ALL_SP_DISTRICTS[0]); // Sé default
   const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>([-23.5505, -46.6333]);
-  const [mapZoom, setMapZoom] = useState<number>(11);
+  const [mapZoom, setMapZoom] = useState<number>(13);
   const [filterZone, setFilterZone] = useState<string>('Todas');
   const [filterRisk, setFilterRisk] = useState<string>('Todos');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [hospitalFilter, setHospitalFilter] = useState<string>('Todos');
-  const [pinMode, setPinMode] = useState<'region' | 'all' | 'none'>('all');
-  const [basemap, setBasemap] = useState<'dark' | 'satellite' | 'street' | 'voyager'>('dark');
-  const [mapLayerMode, setMapLayerMode] = useState<'all' | 'risk' | 'hospitals'>('all');
-  const [polygonOpacity, setPolygonOpacity] = useState<number>(0.38);
-  const [showDistrictLabels, setShowDistrictLabels] = useState<boolean>(false);
-  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
-  const [zoomTrigger, setZoomTrigger] = useState<{ type: 'in' | 'out' | 'recenter'; timestamp: number } | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
-
-  const basemapUrls: Record<string, { url: string; attribution: string }> = {
-    dark: {
-      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-      attribution: '&copy; Esri &mdash; Esri, DeLorme, NAVTEQ, OpenStreetMap'
-    },
-    satellite: {
-      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP'
-    },
-    street: {
-      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    },
-    voyager: {
-      url: 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-      attribution: '&copy; CARTO &copy; OpenStreetMap'
-    }
-  };
+  const [hospitalFilter, setHospitalFilter] = useState<'Todos' | '24h' | 'SUS' | 'Privado'>('Todos');
+  const [showPins, setShowPins] = useState<boolean>(true);
 
   // Real SUS & Temporal Analysis State
   const [selectedYear, setSelectedYear] = useState<string>('Todos');
@@ -171,67 +128,37 @@ export default function MapPage() {
     });
   }, [filterZone, filterRisk, searchQuery]);
 
-  const [hudScope, setHudScope] = useState<'zone' | 'district'>('zone');
-
-  // HUD Hospitals calculation:
-  // When hudScope === 'district', shows hospitals in selectedDistrict.
-  // When hudScope === 'zone', shows all hospitals in filterZone.
-  const hudHospitals = useMemo(() => {
-    let list: Hospital[] = [];
-    if (hudScope === 'district' && selectedDistrict?.hospitalIds) {
-      list = ALL_SP_HOSPITALS.filter(h => selectedDistrict.hospitalIds.includes(h.id));
-    } else {
-      const targetZone = filterZone.trim().toLowerCase();
-      list = ALL_SP_HOSPITALS.filter(h => {
-        if (targetZone === 'todas') return true;
-        return (h?.zone || '').trim().toLowerCase() === targetZone;
-      });
-    }
-
-    return list.filter(h => {
+  // STRICT District Hospitals for HUD:
+  // Shows ONLY hospitals located in the clicked area/subprefeitura!
+  const districtHospitals = useMemo(() => {
+    if (!selectedDistrict || !selectedDistrict.hospitalIds) return [];
+    
+    const matched = ALL_SP_HOSPITALS.filter(h => selectedDistrict.hospitalIds.includes(h.id));
+    
+    return matched.filter(h => {
       if (hospitalFilter === '24h') return Boolean(h?.is_24h);
-      if (hospitalFilter === 'Emergência') return Boolean(h?.is_emergency);
-      if (hospitalFilter === 'SUS') return h?.network === 'SUS';
-      if (hospitalFilter === 'Privado') return h?.network === 'Privado';
-      if (hospitalFilter === 'Filantrópico') return h?.network === 'Filantrópico';
+      if (hospitalFilter === 'SUS') return Boolean(h?.is_public || h?.network === 'SUS' || h?.network === 'Filantrópico');
+      if (hospitalFilter === 'Privado') return Boolean(!h?.is_public || h?.network === 'Privado');
       return true;
     });
-  }, [hudScope, selectedDistrict, filterZone, hospitalFilter]);
+  }, [selectedDistrict, hospitalFilter]);
 
-  // Map Pins: Smart filtering based on pinMode and filterZone
+  // Map Pins: All hospitals within the active zone or entire SP
   const mapVisibleHospitals = useMemo(() => {
-    if (pinMode === 'none') return [];
+    return ALL_SP_HOSPITALS.filter(h => {
+      const hZone = (h?.zone || '').trim().toLowerCase();
+      const matchesZone = filterZone === 'Todas' || hZone === filterZone.trim().toLowerCase();
 
-    let base = ALL_SP_HOSPITALS;
-
-    if (pinMode === 'region') {
-      if (filterZone !== 'Todas') {
-        base = ALL_SP_HOSPITALS.filter(h => (h?.zone || '').trim().toLowerCase() === filterZone.trim().toLowerCase());
-      } else {
-        // In SP Overview with region mode, show key reference hospitals to prevent dense clutter
-        base = ALL_SP_HOSPITALS.filter(h => [101, 102, 201, 204, 301, 306, 401, 405, 501, 510].includes(h.id));
-      }
-    } else if (pinMode === 'all') {
-      if (filterZone !== 'Todas') {
-        base = ALL_SP_HOSPITALS.filter(h => (h?.zone || '').trim().toLowerCase() === filterZone.trim().toLowerCase());
-      }
-    }
-
-    return base.filter(h => {
-      if (hospitalFilter === '24h') return Boolean(h?.is_24h);
-      if (hospitalFilter === 'Emergência') return Boolean(h?.is_emergency);
-      if (hospitalFilter === 'SUS') return h?.network === 'SUS';
-      if (hospitalFilter === 'Privado') return h?.network === 'Privado';
-      if (hospitalFilter === 'Filantrópico') return h?.network === 'Filantrópico';
-      return true;
+      if (hospitalFilter === '24h') return matchesZone && Boolean(h?.is_24h);
+      if (hospitalFilter === 'SUS') return matchesZone && Boolean(h?.is_public || h?.network === 'SUS' || h?.network === 'Filantrópico');
+      if (hospitalFilter === 'Privado') return matchesZone && Boolean(!h?.is_public || h?.network === 'Privado');
+      return matchesZone;
     });
-  }, [pinMode, filterZone, hospitalFilter]);
+  }, [filterZone, hospitalFilter]);
 
   const handleSelectDistrict = (d: SPDistrictRegion) => {
     setSelectedDistrict(d);
     setSelectedHospital(null);
-    setHudScope('district');
-    setFilterZone(d.zone);
     setMapCenter(d.center);
     setMapZoom(14);
   };
@@ -239,7 +166,6 @@ export default function MapPage() {
   const handleSelectZoneFilter = (z: string) => {
     setFilterZone(z);
     setSelectedHospital(null);
-    setHudScope('zone');
 
     if (z !== 'Todas') {
       const firstDistrictInZone = ALL_SP_DISTRICTS.find(d => d.zone.toLowerCase() === z.toLowerCase());
@@ -260,21 +186,9 @@ export default function MapPage() {
     setFilterZone('Todas');
     setFilterRisk('Todos');
     setSearchQuery('');
-    setHudScope('zone');
     setSelectedDistrict(ALL_SP_DISTRICTS[0]);
     setSelectedHospital(null);
   };
-
-  const riskCounts = useMemo(() => {
-    let alto = 0, medio = 0, baixo = 0;
-    ALL_SP_DISTRICTS.forEach(d => {
-      const r = (d.risk || '').toLowerCase();
-      if (r === 'alto') alto++;
-      else if (r === 'médio' || r === 'medio') medio++;
-      else baixo++;
-    });
-    return { alto, medio, baixo, total: ALL_SP_DISTRICTS.length };
-  }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 'calc(100vh - 120px)' }}>
@@ -286,7 +200,7 @@ export default function MapPage() {
             Mapa Geográfico de São Paulo Capital
           </h1>
           <p style={{ fontSize: '0.95rem', color: '#94A3B8', margin: '2px 0 0' }}>
-            Visualização GIS interativa das 32 subprefeituras, indicadores sanitários do SUS e rede hospitalar da capital.
+            Clique em qualquer subprefeitura no mapa para ver exclusivamente os hospitais daquela área.
           </p>
         </div>
 
@@ -311,37 +225,22 @@ export default function MapPage() {
             ))}
           </div>
 
-          {/* Pin Mode Control */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#1E293B', padding: '4px 8px', borderRadius: '10px', border: '1px solid #334155' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#94A3B8' }}>🏥 Pins:</span>
-            {[
-              { id: 'all', label: 'Todos (68)' },
-              { id: 'region', label: 'Por Região' },
-              { id: 'none', label: 'Ocultar' }
-            ].map(p => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => setPinMode(p.id as any)}
-                style={{
-                  padding: '6px 10px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer',
-                  backgroundColor: pinMode === p.id ? '#3B82F6' : 'transparent',
-                  color: pinMode === p.id ? '#FFF' : '#94A3B8',
-                  border: 'none'
-                }}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-
           <button
             type="button"
             onClick={handleRecenterSP}
             className="btn-secondary"
             style={{ fontSize: '0.9rem', padding: '10px 18px' }}
           >
-            🎯 Visão Geral SP
+            🎯 Visão Geral de SP
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowPins(!showPins)}
+            className="btn-primary"
+            style={{ fontSize: '0.9rem', padding: '10px 18px', backgroundColor: showPins ? '#3B82F6' : '#1E293B' }}
+          >
+            🏥 {showPins ? 'Ocultar Pins' : 'Exibir Pins'}
           </button>
         </div>
       </div>
@@ -469,15 +368,15 @@ export default function MapPage() {
             </select>
           </div>
 
-          {/* Area / Region Hospitals HUD Section */}
+          {/* STRICT Area Hospitals HUD Section */}
           <div style={{ borderTop: '1px solid #1E293B', paddingTop: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <div>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
-                  🏥 {hudScope === 'district' ? `Hospitais em ${selectedDistrict.name}` : `Hospitais na ${filterZone}`}
+                  🏥 Hospitais em {selectedDistrict.name}
                 </h3>
                 <span style={{ fontSize: '0.8rem', color: '#60A5FA', fontWeight: 700 }}>
-                  {hudHospitals.length} {hudHospitals.length === 1 ? 'unidade encontrada' : 'unidades encontradas'}
+                  {districtHospitals.length} {districtHospitals.length === 1 ? 'unidade localizada nesta área' : 'unidades localizadas nesta área'}
                 </span>
               </div>
 
@@ -497,62 +396,20 @@ export default function MapPage() {
               >
                 <option value="Todos">Todos</option>
                 <option value="24h">Plantão 24h</option>
-                <option value="Emergência">Emergência</option>
-                <option value="SUS">SUS (Público)</option>
-                <option value="Filantrópico">Filantrópico</option>
+                <option value="SUS">SUS / Público</option>
                 <option value="Privado">Privado</option>
               </select>
             </div>
 
-            {/* Scope Switcher: District vs Entire Zone */}
-            {filterZone !== 'Todas' && (
-              <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-                <button
-                  type="button"
-                  onClick={() => setHudScope('zone')}
-                  style={{
-                    flex: 1,
-                    padding: '6px 10px',
-                    borderRadius: '8px',
-                    fontSize: '0.8rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    backgroundColor: hudScope === 'zone' ? '#2563EB' : '#1E293B',
-                    color: hudScope === 'zone' ? '#FFFFFF' : '#94A3B8',
-                    border: hudScope === 'zone' ? '1px solid #3B82F6' : '1px solid #334155'
-                  }}
-                >
-                  🌐 Toda {filterZone}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setHudScope('district')}
-                  style={{
-                    flex: 1,
-                    padding: '6px 10px',
-                    borderRadius: '8px',
-                    fontSize: '0.8rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    backgroundColor: hudScope === 'district' ? '#2563EB' : '#1E293B',
-                    color: hudScope === 'district' ? '#FFFFFF' : '#94A3B8',
-                    border: hudScope === 'district' ? '1px solid #3B82F6' : '1px solid #334155'
-                  }}
-                >
-                  📍 {selectedDistrict.name}
-                </button>
-              </div>
-            )}
-
-            {/* List of Hospitals Rendered Dynamically */}
+            {/* List of Hospitals STRICT to the selected district */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {hudHospitals.length === 0 ? (
+              {districtHospitals.length === 0 ? (
                 <div style={{ padding: '20px', textAlign: 'center', color: '#94A3B8', backgroundColor: '#070B14', borderRadius: '12px', border: '1px dashed #334155' }}>
                   <span style={{ fontSize: '1.5rem', display: 'block', marginBottom: '6px' }}>📍</span>
-                  <p style={{ margin: 0, fontSize: '0.9rem' }}>Nenhum hospital com este filtro nesta seleção.</p>
+                  <p style={{ margin: 0, fontSize: '0.9rem' }}>Nenhum hospital com este filtro nesta subprefeitura.</p>
                 </div>
               ) : (
-                hudHospitals.map(h => (
+                districtHospitals.map(h => (
                   <div
                     key={`${h.id}-${selectedDistrict.id}`}
                     onClick={() => {
@@ -566,25 +423,19 @@ export default function MapPage() {
                       borderRadius: '12px',
                       padding: '14px',
                       cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      transition: 'all 0.15s ease',
+                      boxShadow: selectedHospital?.id === h.id ? '0 0 16px rgba(59, 130, 246, 0.4)' : 'none'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#60A5FA', backgroundColor: 'rgba(59, 130, 246, 0.15)', padding: '2px 8px', borderRadius: '4px' }}>
-                        {h.network || h.type}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#60A5FA', backgroundColor: 'rgba(59, 130, 246, 0.2)', padding: '2px 8px', borderRadius: '4px' }}>
+                        {h.network || 'HOSPITAL'}
                       </span>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        {h.is_emergency && (
-                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#EF4444', backgroundColor: 'rgba(239, 68, 68, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>
-                            🚨 Emergência
-                          </span>
-                        )}
-                        {h.is_24h && (
-                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>
-                            ⏱ 24h
-                          </span>
-                        )}
-                      </div>
+                      {h.is_emergency && (
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#F87171' }}>
+                          🚨 Emergência 24h
+                        </span>
+                      )}
                     </div>
 
                     <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#FFFFFF', margin: '0 0 4px', lineHeight: 1.3 }}>
@@ -626,222 +477,40 @@ export default function MapPage() {
 
         </aside>
 
-        {/* Right Fluid Leaflet GIS Map View */}
-        <div 
-          className={isFullscreen ? 'gis-map-container-fullscreen' : ''}
-          style={{ 
-            position: 'relative', 
-            borderRadius: isFullscreen ? '0' : '20px', 
-            overflow: 'hidden', 
-            border: isFullscreen ? 'none' : '1px solid #1E293B', 
-            boxShadow: '0 16px 40px rgba(0,0,0,0.6)' 
-          }}
-        >
+        {/* Right Dark Leaflet Map View */}
+        <div style={{ position: 'relative', borderRadius: '20px', overflow: 'hidden', border: '1px solid #1E293B', boxShadow: '0 16px 40px rgba(0,0,0,0.6)' }}>
           
-          {/* ── Minimal Floating Top Bar ── */}
-          <div style={{
-            position: 'absolute', top: 14, left: 14, right: 14, zIndex: 1000,
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            pointerEvents: 'none'
-          }}>
-            {/* Left: basemap label + settings button */}
-            <div className="gis-map-pill-group" style={{ pointerEvents: 'auto' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#94A3B8' }}>
-                {{ dark: '🌙 Dark', satellite: '🛰️ Satélite', street: '🏙️ Ruas', voyager: '🪐 Noturno' }[basemap]}
-              </span>
-              {filterRisk !== 'Todos' && (
-                <span style={{
-                  fontSize: '0.75rem', fontWeight: 800,
-                  color: filterRisk === 'Alto' ? '#EF4444' : filterRisk === 'Médio' ? '#F59E0B' : '#10B981',
-                  padding: '2px 8px', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: '6px'
-                }}>
-                  ● {filterRisk}
-                </span>
-              )}
-              <button
-                type="button"
-                className="gis-map-btn"
-                onClick={() => setSettingsOpen(o => !o)}
-                style={{ fontWeight: 900, color: settingsOpen ? '#60A5FA' : '#CBD5E1', gap: '6px' }}
-              >
-                ⚙️ Configurações
-              </button>
-            </div>
-
-            {/* Right: zoom pill */}
-            <div className="gis-map-pill-group" style={{ pointerEvents: 'auto' }}>
-              <button type="button" className="gis-map-btn gis-map-btn-action"
-                onClick={() => setZoomTrigger({ type: 'in', timestamp: Date.now() })} title="Zoom +"
-              >➕</button>
-              <button type="button" className="gis-map-btn gis-map-btn-action"
-                onClick={() => setZoomTrigger({ type: 'out', timestamp: Date.now() })} title="Zoom -"
-              >➖</button>
-              <button type="button" className="gis-map-btn gis-map-btn-action"
-                onClick={() => { handleRecenterSP(); setZoomTrigger({ type: 'recenter', timestamp: Date.now() }); }}
-                title="Centralizar SP"
-              >🎯 SP</button>
-            </div>
+          {/* Map Status Floating Legend */}
+          <div style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 1000, backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(10px)', padding: '10px 18px', borderRadius: '12px', border: '1px solid #334155', display: 'flex', gap: '14px', fontSize: '0.9rem', fontWeight: 800, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+            <span style={{ color: '#EF4444', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#EF4444', display: 'inline-block' }}></span>
+              Risco Alto
+            </span>
+            <span style={{ color: '#F59E0B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#F59E0B', display: 'inline-block' }}></span>
+              Risco Médio
+            </span>
+            <span style={{ color: '#10B981', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10B981', display: 'inline-block' }}></span>
+              Risco Baixo
+            </span>
           </div>
-
-          {/* ── Sliding Settings Drawer ── */}
-          <div className="gis-settings-panel" style={{ transform: settingsOpen ? 'translateX(0)' : 'translateX(100%)' }}>
-            {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <span style={{ fontSize: '1rem', fontWeight: 900, color: '#FFFFFF' }}>⚙️ Configurações do Mapa</span>
-              <button
-                type="button"
-                onClick={() => setSettingsOpen(false)}
-                style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px' }}
-              >✕</button>
-            </div>
-
-            {/* Section: Mapa Base */}
-            <div className="gis-settings-section">
-              <div className="gis-settings-section-title">🗺️ Mapa Base</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {[
-                  { id: 'dark', label: '🌙 Dark' },
-                  { id: 'satellite', label: '🛰️ Satélite HD' },
-                  { id: 'street', label: '🏙️ Ruas (OSM)' },
-                  { id: 'voyager', label: '🪐 Noturno' }
-                ].map(b => (
-                  <button key={b.id} type="button"
-                    className={`gis-map-btn ${basemap === b.id ? 'active' : ''}`}
-                    onClick={() => setBasemap(b.id as any)}
-                    style={{ flex: '1 1 45%' }}
-                  >{b.label}</button>
-                ))}
-              </div>
-            </div>
-
-            {/* Section: Camada Ativa */}
-            <div className="gis-settings-section">
-              <div className="gis-settings-section-title">👁️ Camada Ativa</div>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {[
-                  { id: 'all', label: '🌐 Completo' },
-                  { id: 'risk', label: '🌡️ Só Risco' },
-                  { id: 'hospitals', label: '🏥 Só Hospitais' }
-                ].map(l => (
-                  <button key={l.id} type="button"
-                    className={`gis-map-btn ${mapLayerMode === l.id ? 'active' : ''}`}
-                    onClick={() => setMapLayerMode(l.id as any)}
-                    style={{ flex: '1 1 45%' }}
-                  >{l.label}</button>
-                ))}
-              </div>
-            </div>
-
-            {/* Section: Pins de Hospitais */}
-            <div className="gis-settings-section">
-              <div className="gis-settings-section-title">🏥 Pins de Hospitais</div>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {[
-                  { id: 'all', label: 'Todos (68)' },
-                  { id: 'region', label: 'Por Região' },
-                  { id: 'none', label: 'Ocultar' }
-                ].map(p => (
-                  <button key={p.id} type="button"
-                    className={`gis-map-btn ${pinMode === p.id ? 'active' : ''}`}
-                    onClick={() => setPinMode(p.id as any)}
-                    style={{ flex: '1 1 45%' }}
-                  >{p.label}</button>
-                ))}
-              </div>
-            </div>
-
-            {/* Section: Opacidade */}
-            <div className="gis-settings-section">
-              <div className="gis-settings-section-title">🎨 Opacidade dos Bairros</div>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                {[
-                  { val: 0.18, label: '20% Leve' },
-                  { val: 0.38, label: '40% Médio' },
-                  { val: 0.70, label: '70% Forte' }
-                ].map(op => (
-                  <button key={op.val} type="button"
-                    className={`gis-map-btn ${polygonOpacity === op.val ? 'active' : ''}`}
-                    onClick={() => setPolygonOpacity(op.val)}
-                    style={{ flex: 1 }}
-                  >{op.label}</button>
-                ))}
-              </div>
-            </div>
-
-            {/* Section: Filtrar por Risco */}
-            <div className="gis-settings-section">
-              <div className="gis-settings-section-title">🔴 Filtrar por Risco</div>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                <button type="button"
-                  className={`gis-map-btn ${filterRisk === 'Alto' ? 'active' : ''}`}
-                  onClick={() => setFilterRisk(filterRisk === 'Alto' ? 'Todos' : 'Alto')}
-                  style={{ color: filterRisk === 'Alto' ? '#FFF' : '#EF4444', flex: 1 }}
-                >● Alto ({riskCounts.alto})</button>
-                <button type="button"
-                  className={`gis-map-btn ${filterRisk === 'Médio' ? 'active' : ''}`}
-                  onClick={() => setFilterRisk(filterRisk === 'Médio' ? 'Todos' : 'Médio')}
-                  style={{ color: filterRisk === 'Médio' ? '#FFF' : '#F59E0B', flex: 1 }}
-                >● Médio ({riskCounts.medio})</button>
-                <button type="button"
-                  className={`gis-map-btn ${filterRisk === 'Baixo' ? 'active' : ''}`}
-                  onClick={() => setFilterRisk(filterRisk === 'Baixo' ? 'Todos' : 'Baixo')}
-                  style={{ color: filterRisk === 'Baixo' ? '#FFF' : '#10B981', flex: 1 }}
-                >● Baixo ({riskCounts.baixo})</button>
-                {filterRisk !== 'Todos' && (
-                  <button type="button" className="gis-map-btn"
-                    onClick={() => setFilterRisk('Todos')}
-                    style={{ color: '#60A5FA', width: '100%' }}
-                  >✕ Limpar Filtro</button>
-                )}
-              </div>
-            </div>
-
-            {/* Section: Visualização */}
-            <div className="gis-settings-section">
-              <div className="gis-settings-section-title">🖥️ Visualização</div>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button type="button"
-                  className={`gis-map-btn ${showDistrictLabels ? 'active' : ''}`}
-                  onClick={() => setShowDistrictLabels(!showDistrictLabels)}
-                  style={{ flex: 1 }}
-                >🏷️ Nomes {showDistrictLabels ? 'ON' : 'OFF'}</button>
-                <button type="button"
-                  className={`gis-map-btn ${isFullscreen ? 'active' : ''}`}
-                  onClick={() => setIsFullscreen(!isFullscreen)}
-                  style={{ flex: 1 }}
-                >{isFullscreen ? '⛶ Sair' : '⛶ Tela Cheia'}</button>
-              </div>
-            </div>
-
-          </div>
-          {/* ── Sliding backdrop (close on click outside) ── */}
-          {settingsOpen && (
-            <div
-              onClick={() => setSettingsOpen(false)}
-              style={{ position: 'absolute', inset: 0, zIndex: 999, background: 'rgba(0,0,0,0.35)', cursor: 'pointer' }}
-            />
-          )}
 
           <MapContainer
             center={mapCenter}
             zoom={mapZoom}
-            style={{ height: '100%', width: '100%', minHeight: isFullscreen ? '100vh' : '720px', backgroundColor: '#070B14' }}
+            style={{ height: '100%', width: '100%', minHeight: '680px', backgroundColor: '#070B14' }}
             zoomControl={false}
           >
-            {/* Dynamic Basemap Tile Layer (Dark Obsidian, Satellite HD, Street, Voyager) */}
+            {/* Dark Matter Map Tiles */}
             <TileLayer
-              key={basemap}
-              url={basemapUrls[basemap].url}
-              attribution={basemapUrls[basemap].attribution}
+              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              attribution='&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap'
             />
-            <MapController 
-              center={mapCenter} 
-              zoom={mapZoom} 
-              zoomTrigger={zoomTrigger} 
-            />
+            <MapFlyTo center={mapCenter} zoom={mapZoom} />
 
-            {/* Clean Modern Risk Polygons with Configurable Opacity & Labels */}
-            {(mapLayerMode === 'all' || mapLayerMode === 'risk') && filteredDistricts.map(district => {
+            {/* Seamless Contiguous Non-Overlapping Polygons */}
+            {filteredDistricts.map(district => {
               const isSelected = selectedDistrict.id === district.id;
               const riskColor = getRiskColor(district.risk);
 
@@ -852,7 +521,7 @@ export default function MapPage() {
                   pathOptions={{
                     color: isSelected ? '#38BDF8' : riskColor,
                     fillColor: riskColor,
-                    fillOpacity: isSelected ? Math.min(1, polygonOpacity + 0.3) : polygonOpacity,
+                    fillOpacity: isSelected ? 0.65 : 0.35,
                     weight: isSelected ? 4 : 2,
                     dashArray: isSelected ? undefined : '2, 2'
                   }}
@@ -860,12 +529,12 @@ export default function MapPage() {
                     click: () => handleSelectDistrict(district)
                   }}
                 >
-                  <Tooltip direction="center" permanent={showDistrictLabels} className="custom-district-tooltip">
-                    <div style={{ padding: '4px 6px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 900, color: '#FFFFFF' }}>{district.name}</div>
-                      <div style={{ color: '#94A3B8', fontSize: '11px', marginTop: '2px' }}>{district.zone} • Subprefeitura {district.subprefeitura}</div>
+                  <Tooltip direction="center" permanent={false} className="custom-district-tooltip">
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: 900, color: '#FFFFFF' }}>{district.name}</div>
+                      <div style={{ color: '#94A3B8', fontSize: '11px', marginTop: '2px' }}>{district.zone} • {district.subprefeitura}</div>
                       <div style={{ color: riskColor, fontSize: '12px', fontWeight: 800, marginTop: '4px' }}>
-                        ● Nível de Risco {district.risk} ({district.cases} casos)
+                        ● Risco {district.risk} ({district.cases} casos)
                       </div>
                     </div>
                   </Tooltip>
@@ -873,8 +542,8 @@ export default function MapPage() {
               );
             })}
 
-            {/* Hospital Markers: Clean and Smart Display without map clutter */}
-            {(mapLayerMode === 'all' || mapLayerMode === 'hospitals') && pinMode !== 'none' && mapVisibleHospitals.map(h => {
+            {/* Hospital Markers: Accurate GPS locations with pulse for district hospitals */}
+            {showPins && mapVisibleHospitals.map(h => {
               const isSelected = selectedHospital?.id === h.id;
               const isDistrictHospital = selectedDistrict.hospitalIds.includes(h.id);
 

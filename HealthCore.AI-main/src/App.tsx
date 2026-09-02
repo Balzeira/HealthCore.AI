@@ -3,7 +3,6 @@ import { createHashRouter, RouterProvider, Outlet, useNavigate, useLocation } fr
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import AuthPage from './pages/AuthPage';
-import SplashScreen from './components/SplashScreen';
 
 import HomePage from './pages/HomePage';
 import MapPage from './pages/MapPage';
@@ -53,7 +52,6 @@ const Layout = ({ user, onLogout }: { user: UserSession | null; onLogout: () => 
 };
 
 export const App = () => {
-  const [showSplash, setShowSplash] = useState(true);
   const [currentUser, setCurrentUser] = useState<UserSession | null>(() => {
     try {
       const saved = localStorage.getItem('healthcore_user');
@@ -67,10 +65,6 @@ export const App = () => {
     localStorage.removeItem('healthcore_user');
     setCurrentUser(null);
   };
-
-  if (showSplash) {
-    return <SplashScreen onDone={() => setShowSplash(false)} />;
-  }
 
   if (!currentUser) {
     return <AuthPage onLoginSuccess={(user) => setCurrentUser(user)} />;
