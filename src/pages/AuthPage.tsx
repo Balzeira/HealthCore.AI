@@ -24,7 +24,7 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
   const startLoginTransition = (userObj: { name: string; email: string; role: string; district: string }) => {
     setIsLoggingIn(true);
     setLoginProgress(10);
-    setLoginStageText('Autenticando credenciais no portal SUS...');
+    setLoginStageText('Autenticando credenciais no HealthCore.AI...');
 
     const interval = setInterval(() => {
       setLoginProgress(p => {
@@ -33,9 +33,9 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
           return 100;
         }
         if (p > 60) {
-          setLoginStageText('Carregando Observatório Epidemiológico de SP...');
+          setLoginStageText('Carregando Inteligência em Saúde Urbana de SP...');
         } else if (p > 30) {
-          setLoginStageText('Sincronizando 96 Distritos e Rede Hospitalar (CNES)...');
+          setLoginStageText('Sincronizando 96 Distritos e Rede de Saúde...');
         }
         return p + 6;
       });
@@ -94,7 +94,7 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
   const handleGuestAccess = () => {
     const guestUser = {
       name: 'Visitante São Paulo',
-      email: 'visitante@healthcore.sp.gov.br',
+      email: 'visitante@healthcore.ai',
       role: 'Acesso Cidadão',
       district: 'Sé (Centro)'
     };
@@ -277,7 +277,7 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
               }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#64748B', fontWeight: 700 }}>
-              <span>Conectando ao SUS</span>
+              <span>Carregando Sistema</span>
               <span style={{ color: '#60A5FA' }}>{loginProgress}%</span>
             </div>
           </div>
@@ -366,7 +366,7 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
           </div>
 
           <p style={{ fontSize: '0.95rem', color: '#94A3B8', margin: 0 }}>
-            Observatório Epidemiológico & Rede Hospitalar de São Paulo
+            Inteligência em Saúde Urbana &amp; Monitoramento Regional
           </p>
         </div>
 
@@ -601,7 +601,7 @@ export default function AuthPage({ onLoginSuccess }: AuthPageProps) {
         {/* Security & LGPD Compliance Footer */}
         <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
           <span>🔒</span>
-          <span>Ambiente Seguro • Dados em conformidade com a LGPD e SUS</span>
+          <span>Ambiente Seguro • Em conformidade com a LGPD • Dados Públicos Abertos</span>
         </div>
 
       </div>

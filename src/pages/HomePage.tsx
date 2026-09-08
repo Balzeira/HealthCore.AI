@@ -80,11 +80,11 @@ export default function HomePage() {
       color: '#F59E0B'
     },
     {
-      title: 'Análise de Predisposição',
+      title: 'Fatores de Risco',
       icon: '🩺',
       tag: 'Saúde Preventiva',
-      desc: 'Calcule seus fatores de risco cruzando hábitos individuais com os dados da sua região.',
-      actionText: 'Calcular Risco',
+      desc: 'Analise fatores de risco cruzando hábitos individuais com indicadores ambientais e regionais.',
+      actionText: 'Analisar Fatores',
       route: '/form/predisposition',
       color: '#A855F7'
     },
@@ -92,10 +92,19 @@ export default function HomePage() {
       title: 'Missão Agente de Saúde',
       icon: '🎮',
       tag: 'Capacitação',
-      desc: 'Desafio prático de saúde pública com emissão de certificado oficial e relatório impresso/e-mail.',
+      desc: 'Treinamento educativo em vigilância sanitária com emissão de certificado e relatório.',
       actionText: 'Iniciar Missão',
       route: '/game',
       color: '#EC4899'
+    },
+    {
+      title: 'Metodologia & Fontes',
+      icon: '📚',
+      tag: 'Transparência',
+      desc: 'Consulte a documentação técnica dos dados abertos (GeoSampa, CNES, SINAN, CETESB).',
+      actionText: 'Ver Metodologia',
+      route: '/methodology',
+      color: '#6366F1'
     }
   ];
 
@@ -128,28 +137,28 @@ export default function HomePage() {
             marginBottom: '14px'
           }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981', display: 'inline-block' }} />
-            <span>Observatório Epidemiológico da Capital Paulista • Dados Oficiais do SUS</span>
+            <span>Inteligência em Saúde Urbana • São Paulo</span>
           </div>
 
           <h1 style={{
             fontSize: '2.2rem',
             fontWeight: 900,
             color: '#FFFFFF',
-            margin: '0 0 10px',
+            margin: '0 0 12px',
             lineHeight: 1.25,
             letterSpacing: '-0.5px'
           }}>
-            Saúde Pública &amp; Vigilância Sanitária de São Paulo
+            Descubra os riscos de saúde ao seu redor.
           </h1>
 
           <p style={{
             fontSize: '1.05rem',
-            color: '#94A3B8',
+            color: '#CBD5E1',
             margin: 0,
             lineHeight: 1.6,
-            maxWidth: '860px'
+            maxWidth: '880px'
           }}>
-            Acompanhe a situação epidemiológica das 32 subprefeituras, consulte a rede hospitalar de 205+ unidades e monitore os alertas do seu bairro de forma simples e rápida.
+            Monitore doenças, condições ambientais, tendências e serviços de saúde da sua região em um só lugar.
           </p>
         </div>
 
@@ -188,7 +197,27 @@ export default function HomePage() {
             }}
           >
             <span>🦠</span>
-            <span>Monitor de Doenças Recorrentes</span>
+            <span>Monitor de Doenças</span>
+          </button>
+
+          <button 
+            onClick={() => navigate('/methodology')} 
+            style={{
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              color: '#60A5FA',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              fontSize: '0.95rem',
+              padding: '12px 20px',
+              borderRadius: '12px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+              fontWeight: 700
+            }}
+          >
+            <span>📚</span>
+            <span>Metodologia &amp; Fontes</span>
           </button>
         </div>
 
@@ -205,7 +234,7 @@ export default function HomePage() {
               Subprefeituras
             </span>
             <strong style={{ fontSize: '1.35rem', color: '#FFFFFF' }}>32 Regiões</strong>
-            <span style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block' }}>96 Distritos Oficiais</span>
+            <span style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block' }}>96 Distritos (GeoSampa)</span>
           </div>
 
           <div>
@@ -213,7 +242,7 @@ export default function HomePage() {
               Casos Monitorados (14d)
             </span>
             <strong style={{ fontSize: '1.35rem', color: '#EF4444' }}>{totalCasesSP.toLocaleString('pt-BR')}</strong>
-            <span style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block' }}>Vigilância Ativa SUS</span>
+            <span style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block' }}>SINAN &amp; InfoDengue</span>
           </div>
 
           <div>
@@ -221,15 +250,15 @@ export default function HomePage() {
               Rede de Saúde Mapeada
             </span>
             <strong style={{ fontSize: '1.35rem', color: '#3B82F6' }}>{ALL_SP_HOSPITALS.length} Unidades</strong>
-            <span style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block' }}>Hospitais, UPAs &amp; PSMs</span>
+            <span style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block' }}>CNES / DataSUS</span>
           </div>
 
           <div>
             <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 800, textTransform: 'uppercase', display: 'block' }}>
-              Integração Oficial
+              Qualidade Ambiental
             </span>
-            <strong style={{ fontSize: '1.35rem', color: '#10B981' }}>SUS / DataSUS</strong>
-            <span style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block' }}>Ministério da Saúde</span>
+            <strong style={{ fontSize: '1.35rem', color: '#10B981' }}>Índice AQI SP</strong>
+            <span style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block' }}>Estações CETESB</span>
           </div>
         </div>
       </section>

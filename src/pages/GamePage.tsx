@@ -295,22 +295,22 @@ export default function GamePage() {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{ width: '56px', height: '56px', borderRadius: '14px', backgroundColor: 'rgba(37, 99, 235, 0.2)', border: '1px solid #3B82F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>
-                🏥
+                🎓
               </div>
               <div>
                 <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#60A5FA', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                  Sistema de Saúde Paulistano • HealthCore.AI
+                  Plataforma de Treinamento Comunitário • HealthCore.AI
                 </span>
-                <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#FFFFFF', margin: '2px 0 0' }}>
-                  Certificado de Capacitação em Vigilância Sanitária
+                <h2 style={{ fontSize: '1.35rem', fontWeight: 900, color: '#FFFFFF', margin: '2px 0 0' }}>
+                  Certificado de Conclusão de Treinamento Educativo
                 </h2>
               </div>
             </div>
 
             <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: '0.75rem', color: '#64748B', display: 'block' }}>Código de Validação</span>
+              <span style={{ fontSize: '0.75rem', color: '#64748B', display: 'block' }}>Código de Conclusão</span>
               <strong style={{ fontSize: '0.85rem', color: '#CBD5E1', fontFamily: 'monospace' }}>
-                HC-SP-{Math.floor(100000 + Math.random() * 900000)}
+                HC-EDU-{Math.floor(100000 + Math.random() * 900000)}
               </strong>
             </div>
           </div>
@@ -460,11 +460,11 @@ export default function GamePage() {
           }}>
             <div>
               <span>Emitido por: </span>
-              <strong style={{ color: '#94A3B8' }}>HealthCore.AI — Observatório Epidemiológico da Capital</strong>
+              <strong style={{ color: '#94A3B8' }}>HealthCore.AI — Programa Educativo de Saúde Urbana</strong>
             </div>
             <div>
-              <span>Chave de Autenticação Digital SUS: </span>
-              <strong style={{ color: '#3B82F6', fontFamily: 'monospace' }}>AUTH-SP-2026-CERT-OK</strong>
+              <span>Registro de Treinamento: </span>
+              <strong style={{ color: '#3B82F6', fontFamily: 'monospace' }}>REG-HC-EDU-2026</strong>
             </div>
           </div>
 

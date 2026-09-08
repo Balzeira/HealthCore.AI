@@ -34,7 +34,7 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
             HealthCore<span className="brand-dot">.AI</span>
             <span className="header-badge-sp">SP</span>
           </div>
-          <span className="header-brand-tag">Observatório da Capital</span>
+          <span className="header-brand-tag">Inteligência em Saúde Urbana</span>
         </div>
       </div>
 
@@ -70,6 +70,14 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
           </NavLink>
 
           <NavLink 
+            to="/diseases" 
+            className={({ isActive }) => `header-nav-item ${isActive ? 'active' : ''}`}
+          >
+            <span className="nav-icon">🦠</span>
+            <span className="nav-label">Doenças</span>
+          </NavLink>
+
+          <NavLink 
             to="/map/facilities" 
             end
             className={({ isActive }) => `header-nav-item ${isActive ? 'active' : ''}`}
@@ -79,11 +87,11 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
           </NavLink>
 
           <NavLink 
-            to="/diseases" 
+            to="/methodology" 
             className={({ isActive }) => `header-nav-item ${isActive ? 'active' : ''}`}
           >
-            <span className="nav-icon">🦠</span>
-            <span className="nav-label">Doenças</span>
+            <span className="nav-icon">📚</span>
+            <span className="nav-label">Metodologia</span>
           </NavLink>
 
           <NavLink 
@@ -99,7 +107,7 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
             className={({ isActive }) => `header-nav-item ${isActive ? 'active' : ''}`}
           >
             <span className="nav-icon">🩺</span>
-            <span className="nav-label">Predisposição</span>
+            <span className="nav-label">Fatores de Risco</span>
           </NavLink>
 
           <NavLink 
@@ -122,12 +130,12 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
         </button>
       </div>
 
-      {/* 3. Right Status & User Account Section (100% Visível & Sem Cortes) */}
+      {/* 3. Right Status & User Account Section */}
       <div className="header-user-section">
         {/* Compact Live Status Dot */}
-        <div className="header-live-badge-compact" title="32 Subprefeituras de SP Monitoradas em Tempo Real">
+        <div className="header-live-badge-compact" title="32 Subprefeituras de SP Monitoradas com Fontes Públicas">
           <span className="header-live-dot"></span>
-          <span>Ao Vivo</span>
+          <span>Monitoramento SP</span>
         </div>
 
         {/* User Account & Logout Control */}

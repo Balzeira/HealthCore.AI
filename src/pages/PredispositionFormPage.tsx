@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { api } from '../api/client';
 import { ALL_SP_DISTRICTS } from '../data/spBoundaries';
+import SearchableDistrictSelect from '../components/SearchableDistrictSelect';
 
 type StepData = {
   bairro: string;
@@ -14,9 +17,10 @@ type StepData = {
 };
 
 export default function PredispositionFormPage() {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [data, setData] = useState<StepData>({
-    bairro: 'Vila Mariana (Zona Sul)',
+    bairro: 'Sé (Centro)',
     exercicio: '',
     freqExercicio: '',
     tabagismo: '',
@@ -28,301 +32,508 @@ export default function PredispositionFormPage() {
   });
 
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<any>(null);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [reportData, setReportData] = useState<any>(null);
 
   const handleNext = () => setStep(p => Math.min(p + 1, 4));
   const handlePrev = () => setStep(p => Math.max(p - 1, 1));
 
   const toggleArrayItem = (field: 'historicoFamiliar' | 'condicoesCronicas', item: string) => {
     if (item === 'Nenhuma') {
-      setData({ ...data, [field]: ['Nenhuma'] });
+      setData(prev => ({ ...prev, [field]: ['Nenhuma'] }));
       return;
     }
     const current = data[field].filter(i => i !== 'Nenhuma');
     if (current.includes(item)) {
-      setData({ ...data, [field]: current.filter(i => i !== item) });
+      setData(prev => ({ ...prev, [field]: current.filter(i => i !== item) }));
     } else {
-      setData({ ...data, [field]: [...current, item] });
+      setData(prev => ({ ...prev, [field]: [...current, item] }));
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setResults([
-        {
-          name: 'Doença Cardiovascular & Hipertensão',
-          risk: 'Moderado',
-          score: 60,
-          color: '#F59E0B',
-          factors: data.historicoFamiliar.length > 0 ? data.historicoFamiliar : ['Histórico e Rotina Urbana'],
-          recs: 'Realize aferição regular de pressão arterial na UBS mais próxima e adote caminhadas semanais.'
+    setErrorMessage('');
+
+    try {
+      const payload = {
+        district_name: data.bairro,
+        habits: {
+          exercicio: data.exercicio,
+          freqExercicio: data.freqExercicio,
+          tabagismo: data.tabagismo,
+          alimentacao: data.alimentacao,
+          sono: data.sono,
+          alcool: data.alcool
         },
-        {
-          name: 'Vulnerabilidade Respiratória (Qualidade do Ar SP)',
-          risk: 'Alerta',
-          score: 75,
-          color: '#EF4444',
-          factors: ['Exposição à Poluição Urbana', 'Tempo Seco'],
-          recs: 'Mantenha hidratação constante acima de 2L/dia e evite exercícios ao ar livre em horários de pico de tráfego.'
-        },
-        {
-          name: 'Metabolismo & Diabetes Tipo 2',
-          risk: 'Baixo',
-          score: 25,
-          color: '#10B981',
-          factors: ['Perfil metabólico favorável'],
-          recs: 'Mantenha o bom padrão alimentar rico em fibras e vegetais frescos.'
-        }
-      ]);
+        family_history: data.historicoFamiliar,
+        chronic_conditions: data.condicoesCronicas
+      };
+
+      const response = await api.post<any>('/predisposition/calculate', payload);
+      if (response && response.results) {
+        setReportData(response);
+      } else {
+        throw new Error('Formato de resposta inesperado do servidor.');
+      }
+    } catch (err: any) {
+      console.warn('API error, executing fallback deterministic calculation:', err);
+      // Deterministic fallback matching backend heuristic if offline
+      const isSmoker = data.tabagismo.includes('Fumo');
+      const isSedentary = data.exercicio === 'Não' || data.freqExercicio.includes('Raramente');
+      const hasFamily = data.historicoFamiliar.some(f => f !== 'Nenhuma');
+      const hasChronic = data.condicoesCronicas.some(c => c !== 'Nenhuma');
+
+      setReportData({
+        success: true,
+        district: data.bairro,
+        disclaimer: 'Este indicador é exclusivamente educativo e informativo, não constitui diagnóstico médico e não substitui a avaliação de um profissional de saúde.',
+        methodology: 'Modelo heurístico baseado em fatores de risco de saúde pública da OMS e dados territoriais de São Paulo.',
+        evaluated_at: new Date().toISOString(),
+        results: [
+          {
+            dimension: 'Saúde Cardiovascular & Metabólica',
+            risk_level: (isSmoker && isSedentary) || hasChronic ? 'Elevado' : (isSmoker || isSedentary || hasFamily) ? 'Moderado' : 'Baixo',
+            factors: [
+              ...(isSmoker ? ['Tabagismo ativo informado'] : []),
+              ...(isSedentary ? ['Sedentarismo / baixa frequência de exercícios'] : []),
+              ...(hasFamily ? ['Histórico familiar registrado'] : []),
+              ...(hasChronic ? ['Condição metabólica ou pressórica preexistente'] : []),
+              ...(!isSmoker && !isSedentary && !hasFamily && !hasChronic ? ['Hábitos e histórico favoráveis'] : [])
+            ],
+            recommendations: 'Monitore periodicamente sua pressão arterial e glicemia na UBS/clínica e priorize caminhadas regulares.'
+          },
+          {
+            dimension: 'Vulnerabilidade Respiratória & Ambiente',
+            risk_level: isSmoker || data.condicoesCronicas.some(c => c.includes('Asma') || c.includes('Bronquite')) ? 'Elevado' : 'Moderado',
+            factors: [
+              ...(isSmoker ? ['Inalação de fumaça de tabaco'] : []),
+              'Exposição ao material particulado atmosférico da capital paulista',
+              ...(data.condicoesCronicas.some(c => c.includes('Asma') || c.includes('Bronquite')) ? ['Histórico respiratório prévio'] : [])
+            ],
+            recommendations: 'Mantenha hidratação diária (mínimo 2 litros de água) e evite exercícios ao ar livre em dias de ar seco.'
+          },
+          {
+            dimension: 'Exposição Ambiental a Vetores Urbanos',
+            risk_level: 'Moderado',
+            factors: [
+              `Região de monitoramento: ${data.bairro}`,
+              'Sazonalidade urbana favorável à proliferação de vetores em água parada'
+            ],
+            recommendations: 'Realize vistoria semanal no domicílio eliminando água acumulada em vasos e calhas.'
+          }
+        ]
+      });
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
-  if (results) {
+  const getRiskBadge = (level: string) => {
+    const l = (level || '').toLowerCase();
+    if (l === 'elevado' || l === 'alto') {
+      return { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.4)', text: '#F87171', label: 'Nível Elevado' };
+    }
+    if (l === 'moderado' || l === 'médio') {
+      return { bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.4)', text: '#FCD34D', label: 'Nível Moderado' };
+    }
+    return { bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.4)', text: '#34D399', label: 'Nível Baixo' };
+  };
+
+  if (reportData) {
     return (
-      <div style={{ maxWidth: '880px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ maxWidth: '880px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px', paddingBottom: '50px' }}>
+        
+        {/* Header */}
         <div style={{ textAlign: 'center' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34D399', padding: '6px 18px', borderRadius: '20px', fontWeight: 800, fontSize: '0.9rem', marginBottom: '12px' }}>
-            <span>✅</span>
-            <span>Mapeamento Concluído</span>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60A5FA', padding: '6px 18px', borderRadius: '20px', fontWeight: 800, fontSize: '0.85rem', marginBottom: '12px' }}>
+            <span>🩺</span>
+            <span>Avaliação Informativa Concluída</span>
           </div>
-          <h1 style={{ fontSize: '2.2rem', fontWeight: 900, color: '#FFFFFF', margin: '0 0 8px' }}>
-            Relatório de Predisposição Epidemiológica
+          <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#FFFFFF', margin: '0 0 8px' }}>
+            Indicador Informativo de Fatores de Risco
           </h1>
-          <p style={{ fontSize: '1.05rem', color: '#94A3B8', margin: 0 }}>
-            Indicadores calculados considerando seu perfil individual cruzado com a subprefeitura selecionada.
+          <p style={{ fontSize: '1rem', color: '#94A3B8', margin: 0 }}>
+            Análise exploratória combinando seus hábitos e histórico com o contexto urbano de <strong>{reportData.district}</strong>.
           </p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-          {results.map((res: any, i: number) => (
-            <div key={i} className="hud-card" style={{ padding: '28px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ margin: 0, color: '#FFFFFF', fontSize: '1.35rem', fontWeight: 800 }}>{res.name}</h3>
-                <span style={{ backgroundColor: `${res.color}25`, color: res.color, border: `1px solid ${res.color}50`, padding: '8px 16px', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 800 }}>
-                  ● Risco {res.risk} ({res.score}%)
-                </span>
-              </div>
-
-              <div style={{ width: '100%', height: '10px', backgroundColor: '#1E293B', borderRadius: '5px', marginBottom: '20px', overflow: 'hidden' }}>
-                <div style={{ width: `${res.score}%`, height: '100%', backgroundColor: res.color, borderRadius: '5px' }}></div>
-              </div>
-
-              <div style={{ backgroundColor: '#070B14', padding: '18px', borderRadius: '14px', border: '1px solid #1E293B' }}>
-                <strong style={{ fontSize: '0.95rem', color: '#60A5FA', display: 'block', marginBottom: '4px' }}>💡 Recomendação Preventiva:</strong>
-                <p style={{ margin: 0, fontSize: '0.95rem', color: '#CBD5E1', lineHeight: 1.5 }}>{res.recs}</p>
-              </div>
-            </div>
-          ))}
+        {/* Mandatory Medical Disclaimer Alert Box */}
+        <div style={{
+          backgroundColor: 'rgba(245, 158, 11, 0.1)',
+          border: '1px solid rgba(245, 158, 11, 0.4)',
+          borderRadius: '14px',
+          padding: '16px 20px',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '14px'
+        }}>
+          <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>⚠️</span>
+          <div>
+            <strong style={{ fontSize: '0.9rem', color: '#FCD34D', display: 'block', marginBottom: '4px' }}>
+              Aviso Importante de Responsabilidade Médica
+            </strong>
+            <p style={{ fontSize: '0.85rem', color: '#CBD5E1', margin: 0, lineHeight: 1.5 }}>
+              {reportData.disclaimer || 'Este indicador é exclusivamente educativo e informativo, não constitui diagnóstico médico e não substitui a avaliação de um profissional de saúde.'}
+            </p>
+          </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '16px' }}>
-          <button onClick={() => setResults(null)} className="btn-secondary" style={{ flex: 1, padding: '16px' }}>
-            Refazer Análise
+        {/* Results Dimensions Cards (No fake percentages, strictly qualitative) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {reportData.results.map((res: any, i: number) => {
+            const badge = getRiskBadge(res.risk_level);
+            return (
+              <div key={i} className="hud-card" style={{ padding: '24px', backgroundColor: '#0F172A', border: '1px solid #1E293B' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                  <h3 style={{ margin: 0, color: '#FFFFFF', fontSize: '1.25rem', fontWeight: 800 }}>
+                    {res.dimension}
+                  </h3>
+                  <span style={{
+                    backgroundColor: badge.bg,
+                    color: badge.text,
+                    border: `1px solid ${badge.border}`,
+                    padding: '4px 12px',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    fontWeight: 800
+                  }}>
+                    ● {badge.label}
+                  </span>
+                </div>
+
+                {/* Factors list */}
+                <div style={{ marginBottom: '14px' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 800, display: 'block', marginBottom: '6px' }}>
+                    Fatores Identificados
+                  </span>
+                  <ul style={{ margin: 0, paddingLeft: '18px', color: '#CBD5E1', fontSize: '0.88rem', lineHeight: 1.5 }}>
+                    {res.factors.map((f: string, fIdx: number) => (
+                      <li key={fIdx} style={{ marginBottom: '3px' }}>{f}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Prevention guidance */}
+                <div style={{ backgroundColor: '#070B14', padding: '14px 18px', borderRadius: '10px', border: '1px solid #1E293B' }}>
+                  <strong style={{ fontSize: '0.8rem', color: '#60A5FA', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>
+                    💡 Orientação Preventiva de Estilo de Vida
+                  </strong>
+                  <p style={{ margin: 0, fontSize: '0.88rem', color: '#E2E8F0', lineHeight: 1.5 }}>
+                    {res.recommendations}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setReportData(null)}
+            style={{
+              backgroundColor: '#1E293B',
+              color: '#FFFFFF',
+              border: '1px solid #334155',
+              borderRadius: '12px',
+              padding: '12px 24px',
+              fontSize: '0.95rem',
+              fontWeight: 800,
+              cursor: 'pointer'
+            }}
+          >
+            🔄 Recalcular Indicador
           </button>
-          <button onClick={() => window.print()} className="btn-primary" style={{ flex: 1, padding: '16px' }}>
-            Imprimir Relatório 🖨️
+
+          <button
+            onClick={() => navigate('/methodology')}
+            className="btn-primary"
+            style={{ padding: '12px 24px', fontSize: '0.95rem', borderRadius: '12px' }}
+          >
+            📚 Entender a Metodologia
           </button>
         </div>
+
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: '840px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ maxWidth: '840px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px', paddingBottom: '50px' }}>
       
       {/* Header */}
       <div style={{ textAlign: 'center' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#C084FC', padding: '6px 18px', borderRadius: '20px', fontWeight: 800, fontSize: '0.9rem', marginBottom: '12px' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#C084FC', padding: '6px 18px', borderRadius: '20px', fontWeight: 800, fontSize: '0.85rem', marginBottom: '12px' }}>
           <span>🩺</span>
-          <span>Inteligência Preventiva</span>
+          <span>Saúde Preventiva & Hábitos</span>
         </div>
-        <h1 style={{ fontSize: '2.2rem', fontWeight: 900, color: '#FFFFFF', margin: '0 0 8px' }}>
-          Análise de Predisposição Epidemiológica
+        <h1 style={{ fontSize: '2.1rem', fontWeight: 900, color: '#FFFFFF', margin: '0 0 8px' }}>
+          Indicador de Fatores de Risco
         </h1>
-        <p style={{ fontSize: '1.05rem', color: '#94A3B8', margin: 0 }}>
-          Avalie fatores de vulnerabilidade com base nos indicadores sanitários da sua subprefeitura.
+        <p style={{ fontSize: '1rem', color: '#94A3B8', margin: 0 }}>
+          Mapeie como seus hábitos diários e histórico interagem com o ambiente urbano do seu bairro.
         </p>
       </div>
 
-      {/* Step Progress Bar */}
-      <div className="hud-card" style={{ padding: '20px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 800, color: '#60A5FA', marginBottom: '10px' }}>
-          <span>ETAPA {step} DE 4</span>
-          <span>{step * 25}% CONCLUÍDO</span>
-        </div>
-        <div style={{ width: '100%', height: '8px', backgroundColor: '#1E293B', borderRadius: '4px', overflow: 'hidden' }}>
-          <div style={{ width: `${step * 25}%`, height: '100%', backgroundColor: '#3B82F6', borderRadius: '4px', transition: 'width 0.3s ease' }}></div>
-        </div>
+      {/* Steps Indicator */}
+      <div className="hud-card" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {[
+          { num: 1, label: 'Região' },
+          { num: 2, label: 'Estilo de Vida' },
+          { num: 3, label: 'Histórico Familiar' },
+          { num: 4, label: 'Saúde Pessoal' }
+        ].map(s => {
+          const isCurrent = step === s.num;
+          const isDone = step > s.num;
+          return (
+            <div key={s.num} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.85rem', fontWeight: 800,
+                backgroundColor: isCurrent ? '#A855F7' : isDone ? '#10B981' : '#1E293B',
+                color: '#FFFFFF'
+              }}>
+                {isDone ? '✓' : s.num}
+              </div>
+              <span style={{ fontSize: '0.8rem', color: isCurrent ? '#FFFFFF' : '#64748B', fontWeight: isCurrent ? 800 : 600 }}>
+                {s.label}
+              </span>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Step Contents */}
-      <div className="hud-card" style={{ padding: '36px', minHeight: '340px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-        <div>
-          {step === 1 && (
+      {/* Form Container */}
+      <div className="hud-card" style={{ padding: '32px', backgroundColor: '#0F172A', border: '1px solid #1E293B' }}>
+        
+        {/* Step 1: Bairro */}
+        {step === 1 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div>
-              <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '8px', color: '#FFFFFF' }}>
-                1. Onde você reside em São Paulo?
+              <h2 style={{ fontSize: '1.3rem', color: '#FFFFFF', margin: '0 0 6px', fontWeight: 800 }}>
+                1. Onde você reside ou passa a maior parte do tempo?
               </h2>
-              <p style={{ color: '#94A3B8', fontSize: '1rem', marginBottom: '24px' }}>
-                Selecione sua subprefeitura para cruzamento com índice de qualidade do ar e histórico da região.
+              <p style={{ fontSize: '0.9rem', color: '#94A3B8', margin: 0 }}>
+                O contexto territorial (qualidade do ar e focos sanitários) é considerado na análise.
               </p>
+            </div>
 
-              <select
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 800, color: '#CBD5E1', display: 'block', marginBottom: '8px' }}>
+                Selecione sua Subprefeitura / Bairro:
+              </label>
+              <SearchableDistrictSelect
                 value={data.bairro}
-                onChange={e => setData({ ...data, bairro: e.target.value })}
-                style={{
-                  width: '100%',
-                  backgroundColor: '#070B14',
-                  color: '#FFFFFF',
-                  border: '1px solid #334155',
-                  borderRadius: '14px',
-                  padding: '16px',
-                  fontSize: '1.05rem',
-                  fontWeight: 700,
-                  outline: 'none'
-                }}
-              >
-                {ALL_SP_DISTRICTS.map(d => (
-                  <option key={d.id} value={`${d.name} (${d.zone})`}>
-                    {d.name} ({d.zone}) — Subprefeitura {d.subprefeitura}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setData({ ...data, bairro: val })}
+                buttonStyle={{ padding: '14px', borderRadius: '12px' }}
+              />
             </div>
-          )}
+          </div>
+        )}
 
-          {step === 2 && (
+        {/* Step 2: Hábitos de Vida */}
+        {step === 2 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div>
-              <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '8px', color: '#FFFFFF' }}>
-                2. Hábitos de Vida & Sono
+              <h2 style={{ fontSize: '1.3rem', color: '#FFFFFF', margin: '0 0 6px', fontWeight: 800 }}>
+                2. Hábitos de Vida &amp; Atividade
               </h2>
-              <p style={{ color: '#94A3B8', fontSize: '1rem', marginBottom: '24px' }}>
-                Seus hábitos de atividade física e descanso auxiliam no cálculo de proteção.
+              <p style={{ fontSize: '0.9rem', color: '#94A3B8', margin: 0 }}>
+                Informe sua rotina para estimarmos os fatores metabólicos e cardiovasculares.
               </p>
+            </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 800, fontSize: '0.95rem', color: '#F8FAFC' }}>
-                    Prática de Exercícios Físicos
-                  </label>
-                  <select
-                    value={data.exercicio}
-                    onChange={e => setData({ ...data, exercicio: e.target.value })}
-                    style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #334155', backgroundColor: '#070B14', color: '#FFFFFF', fontWeight: 700, outline: 'none' }}
-                  >
-                    <option value="">Selecione...</option>
-                    <option value="Regular">Sim, regularmente (3x ou mais por semana)</option>
-                    <option value="Moderado">Moderado (1 a 2x por semana)</option>
-                    <option value="Sedentário">Sedentário (Não pratico)</option>
-                  </select>
-                </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 800, color: '#CBD5E1', display: 'block', marginBottom: '6px' }}>
+                  Frequência de Exercício Físico:
+                </label>
+                <select
+                  value={data.freqExercicio}
+                  onChange={(e) => setData({ ...data, freqExercicio: e.target.value, exercicio: e.target.value.includes('Raramente') ? 'Não' : 'Sim' })}
+                  style={{ width: '100%', backgroundColor: '#070B14', color: '#FFFFFF', border: '1px solid #334155', borderRadius: '10px', padding: '12px', fontSize: '0.9rem', outline: 'none' }}
+                >
+                  <option value="">Selecione...</option>
+                  <option value="3 ou mais vezes por semana">3 ou mais vezes por semana (Ativo)</option>
+                  <option value="1 a 2 vezes por semana">1 a 2 vezes por semana (Moderado)</option>
+                  <option value="Raramente ou nunca">Raramente ou nunca (Sedentário)</option>
+                </select>
+              </div>
 
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 800, fontSize: '0.95rem', color: '#F8FAFC' }}>
-                    Média de Horas de Sono
-                  </label>
-                  <select
-                    value={data.sono}
-                    onChange={e => setData({ ...data, sono: e.target.value })}
-                    style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #334155', backgroundColor: '#070B14', color: '#FFFFFF', fontWeight: 700, outline: 'none' }}
-                  >
-                    <option value="">Selecione...</option>
-                    <option value="Menos de 5h">Menos de 5 horas por noite</option>
-                    <option value="5-6h">5 a 6 horas por noite</option>
-                    <option value="7-8h">7 a 8 horas (Recomendado)</option>
-                    <option value="8h+">Mais de 8 horas</option>
-                  </select>
-                </div>
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 800, color: '#CBD5E1', display: 'block', marginBottom: '6px' }}>
+                  Uso de Tabaco / Cigarro:
+                </label>
+                <select
+                  value={data.tabagismo}
+                  onChange={(e) => setData({ ...data, tabagismo: e.target.value })}
+                  style={{ width: '100%', backgroundColor: '#070B14', color: '#FFFFFF', border: '1px solid #334155', borderRadius: '10px', padding: '12px', fontSize: '0.9rem', outline: 'none' }}
+                >
+                  <option value="">Selecione...</option>
+                  <option value="Não fumo">Não fumo</option>
+                  <option value="Ex-fumante">Ex-fumante</option>
+                  <option value="Fumo ocasionalmente">Fumo ocasionalmente / cigarro eletrônico</option>
+                  <option value="Fumo diariamente">Fumo diariamente</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 800, color: '#CBD5E1', display: 'block', marginBottom: '6px' }}>
+                  Padrão Alimentar Predominante:
+                </label>
+                <select
+                  value={data.alimentacao}
+                  onChange={(e) => setData({ ...data, alimentacao: e.target.value })}
+                  style={{ width: '100%', backgroundColor: '#070B14', color: '#FFFFFF', border: '1px solid #334155', borderRadius: '10px', padding: '12px', fontSize: '0.9rem', outline: 'none' }}
+                >
+                  <option value="">Selecione...</option>
+                  <option value="Equilibrada com vegetais e frutas">Equilibrada (vegetais, frutas e proteínas)</option>
+                  <option value="Mista com consumo moderado de doces">Mista com consumo moderado de açúcar</option>
+                  <option value="Ultraprocessados e fast-food">Predominância de ultraprocessados / fast-food</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 800, color: '#CBD5E1', display: 'block', marginBottom: '6px' }}>
+                  Qualidade do Sono:
+                </label>
+                <select
+                  value={data.sono}
+                  onChange={(e) => setData({ ...data, sono: e.target.value })}
+                  style={{ width: '100%', backgroundColor: '#070B14', color: '#FFFFFF', border: '1px solid #334155', borderRadius: '10px', padding: '12px', fontSize: '0.9rem', outline: 'none' }}
+                >
+                  <option value="">Selecione...</option>
+                  <option value="7 a 8 horas reparadoras">7 a 8 horas (Sono reparador)</option>
+                  <option value="5 a 6 horas irregulares">5 a 6 horas irregulares</option>
+                  <option value="Menos de 5 horas">Menos de 5 horas (Insônia / privação crônica)</option>
+                </select>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {step === 3 && (
+        {/* Step 3: Histórico Familiar */}
+        {step === 3 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div>
-              <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '8px', color: '#FFFFFF' }}>
-                3. Histórico Familiar
+              <h2 style={{ fontSize: '1.3rem', color: '#FFFFFF', margin: '0 0 6px', fontWeight: 800 }}>
+                3. Histórico Familiar (Pais, Irmãos e Avós)
               </h2>
-              <p style={{ color: '#94A3B8', fontSize: '1rem', marginBottom: '20px' }}>
-                Selecione as condições prévias existentes no seu núcleo familiar:
+              <p style={{ fontSize: '0.9rem', color: '#94A3B8', margin: 0 }}>
+                Selecione as condições presentes em familiares diretos:
               </p>
+            </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                {['Diabetes', 'Doenças Cardíacas / Infarto', 'Hipertensão Arterial', 'Doenças Respiratórias / Asma', 'Nenhuma'].map(cond => (
-                  <label
-                    key={cond}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
+              {[
+                'Hipertensão Arterial',
+                'Diabetes Tipo 2',
+                'Infarto / Doença Cardíaca',
+                'Asma ou Alergias Respiratórias',
+                'Nenhuma'
+              ].map(item => {
+                const isSelected = data.historicoFamiliar.includes(item);
+                return (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => toggleArrayItem('historicoFamiliar', item)}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: '12px', padding: '16px',
-                      backgroundColor: data.historicoFamiliar.includes(cond) ? 'rgba(59, 130, 246, 0.2)' : '#070B14',
-                      borderRadius: '12px', border: data.historicoFamiliar.includes(cond) ? '2px solid #3B82F6' : '1px solid #1E293B',
+                      padding: '12px 16px', borderRadius: '10px', textAlign: 'left', fontSize: '0.88rem',
+                      backgroundColor: isSelected ? 'rgba(168, 85, 247, 0.2)' : '#070B14',
+                      border: isSelected ? '1.5px solid #A855F7' : '1px solid #1E293B',
+                      color: isSelected ? '#FFFFFF' : '#CBD5E1',
+                      fontWeight: isSelected ? 800 : 500,
                       cursor: 'pointer'
                     }}
                   >
-                    <input
-                      type="checkbox"
-                      checked={data.historicoFamiliar.includes(cond)}
-                      onChange={() => toggleArrayItem('historicoFamiliar', cond)}
-                      style={{ width: '20px', height: '20px', accentColor: '#3B82F6' }}
-                    />
-                    <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#FFFFFF' }}>{cond}</span>
-                  </label>
-                ))}
-              </div>
+                    {isSelected ? '✓ ' : '+ '} {item}
+                  </button>
+                );
+              })}
             </div>
-          )}
+          </div>
+        )}
 
-          {step === 4 && (
+        {/* Step 4: Saúde Pessoal */}
+        {step === 4 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div>
-              <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '8px', color: '#FFFFFF' }}>
-                4. Condições Pessoais Atuais
+              <h2 style={{ fontSize: '1.3rem', color: '#FFFFFF', margin: '0 0 6px', fontWeight: 800 }}>
+                4. Condições de Saúde Pessoais
               </h2>
-              <p style={{ color: '#94A3B8', fontSize: '1rem', marginBottom: '20px' }}>
-                Você possui diagnóstico médico para alguma das condições abaixo?
+              <p style={{ fontSize: '0.9rem', color: '#94A3B8', margin: 0 }}>
+                Você possui diagnóstico médico prévio de alguma das condições abaixo?
               </p>
+            </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                {['Diabetes', 'Hipertensão', 'Alergia Respiratória / Asma', 'Colesterol Elevado', 'Nenhuma'].map(cond => (
-                  <label
-                    key={cond}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
+              {[
+                'Hipertensão Diagnosticada',
+                'Diabetes / Pré-Diabetes',
+                'Asma ou Bronquite Crônica',
+                'Colesterol Elevado',
+                'Nenhuma'
+              ].map(item => {
+                const isSelected = data.condicoesCronicas.includes(item);
+                return (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => toggleArrayItem('condicoesCronicas', item)}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: '12px', padding: '16px',
-                      backgroundColor: data.condicoesCronicas.includes(cond) ? 'rgba(59, 130, 246, 0.2)' : '#070B14',
-                      borderRadius: '12px', border: data.condicoesCronicas.includes(cond) ? '2px solid #3B82F6' : '1px solid #1E293B',
+                      padding: '12px 16px', borderRadius: '10px', textAlign: 'left', fontSize: '0.88rem',
+                      backgroundColor: isSelected ? 'rgba(168, 85, 247, 0.2)' : '#070B14',
+                      border: isSelected ? '1.5px solid #A855F7' : '1px solid #1E293B',
+                      color: isSelected ? '#FFFFFF' : '#CBD5E1',
+                      fontWeight: isSelected ? 800 : 500,
                       cursor: 'pointer'
                     }}
                   >
-                    <input
-                      type="checkbox"
-                      checked={data.condicoesCronicas.includes(cond)}
-                      onChange={() => toggleArrayItem('condicoesCronicas', cond)}
-                      style={{ width: '20px', height: '20px', accentColor: '#3B82F6' }}
-                    />
-                    <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#FFFFFF' }}>{cond}</span>
-                  </label>
-                ))}
-              </div>
+                    {isSelected ? '✓ ' : '+ '} {item}
+                  </button>
+                );
+              })}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Buttons */}
-        <div style={{ display: 'flex', gap: '16px', marginTop: '36px' }}>
-          {step > 1 && (
-            <button onClick={handlePrev} className="btn-secondary" style={{ flex: 1, padding: '16px' }}>
-              ◀ Voltar
+        {/* Navigation Buttons */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '28px', paddingTop: '20px', borderTop: '1px solid #1E293B' }}>
+          {step > 1 ? (
+            <button
+              type="button"
+              onClick={handlePrev}
+              style={{ backgroundColor: '#1E293B', color: '#CBD5E1', border: '1px solid #334155', borderRadius: '10px', padding: '10px 20px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer' }}
+            >
+              ‹ Voltar
             </button>
-          )}
+          ) : <div />}
+
           {step < 4 ? (
-            <button onClick={handleNext} className="btn-primary" style={{ flex: 2, padding: '16px' }}>
-              Avançar para Etapa {step + 1} ▶
+            <button
+              type="button"
+              onClick={handleNext}
+              className="btn-primary"
+              style={{ padding: '10px 24px', fontSize: '0.9rem', borderRadius: '10px' }}
+            >
+              Avançar ›
             </button>
           ) : (
-            <button onClick={handleSubmit} disabled={loading} className="btn-emerald" style={{ flex: 2, padding: '16px' }}>
-              {loading ? 'Calculando Indicadores...' : 'Concluir & Gerar Relatório ▶'}
+            <button
+              type="button"
+              disabled={loading}
+              onClick={handleSubmit}
+              className="btn-primary"
+              style={{ padding: '12px 28px', fontSize: '0.95rem', borderRadius: '10px', opacity: loading ? 0.7 : 1 }}
+            >
+              {loading ? 'Calculando Indicadores...' : 'Calcular Indicadores de Risco 🩺'}
             </button>
           )}
         </div>
+
       </div>
 
     </div>
