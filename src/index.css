@@ -686,3 +686,58 @@ p { font-size: 1rem; color: var(--text-secondary); line-height: 1.6; }
     display: none;
   }
 }
+
+/* ==========================================================================
+   Print Specific Media Queries (Quiz Report & Official Certificates)
+   ========================================================================== */
+@media print {
+  /* Hide all app navigation, headers, footers and interactive action bars */
+  body, html {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+  }
+
+  .executive-header,
+  .bottom-nav,
+  .no-print,
+  button,
+  .btn-primary,
+  .header-nav-scroll-btn {
+    display: none !important;
+  }
+
+  .page-content {
+    padding: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+
+  /* Style certificate container for crisp A4 print */
+  #print-certificate,
+  .print-report-container {
+    background: #FFFFFF !important;
+    color: #0F172A !important;
+    border: 2px solid #0F172A !important;
+    box-shadow: none !important;
+    padding: 24px !important;
+    page-break-inside: avoid;
+    border-radius: 8px !important;
+  }
+
+  #print-certificate * {
+    color: #0F172A !important;
+    background-color: transparent !important;
+    border-color: #CBD5E1 !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+  }
+
+  #print-certificate h1,
+  #print-certificate h2,
+  #print-certificate h3,
+  #print-certificate strong {
+    color: #000000 !important;
+  }
+}
+

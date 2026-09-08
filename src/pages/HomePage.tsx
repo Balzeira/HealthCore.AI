@@ -476,14 +476,38 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Card 2: Catálogo Geral de Hospitais */}
+          {/* Card 2: Doenças Mais Recorrentes */}
+          <div className="hud-card hud-card-interactive" onClick={() => navigate('/diseases')}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '14px', backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>
+                🦠
+              </div>
+              <span style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#F87171', fontSize: '0.85rem', fontWeight: 800, padding: '4px 12px', borderRadius: '20px' }}>
+                Vigilância Ativa
+              </span>
+            </div>
+
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#FFFFFF', margin: '0 0 8px' }}>
+              Doenças Mais Recorrentes
+            </h3>
+            <p style={{ fontSize: '0.95rem', color: '#94A3B8', margin: '0 0 20px', lineHeight: 1.5 }}>
+              Pesquise por patologias como Dengue, COVID-19, Leptospirose e Asma e descubra exatamente quais bairros da capital estão sob maior impacto.
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#EF4444', fontWeight: 800, fontSize: '1rem' }}>
+              <span>Consultar Doenças &amp; Bairros</span>
+              <span>→</span>
+            </div>
+          </div>
+
+          {/* Card 3: Catálogo Geral de Hospitais */}
           <div className="hud-card hud-card-interactive" onClick={() => navigate('/map/facilities')}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ width: '56px', height: '56px', borderRadius: '14px', backgroundColor: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>
                 🏥
               </div>
               <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34D399', fontSize: '0.85rem', fontWeight: 800, padding: '4px 12px', borderRadius: '20px' }}>
-                45+ Hospitais de SP
+                205+ Unidades de SP
               </span>
             </div>
 

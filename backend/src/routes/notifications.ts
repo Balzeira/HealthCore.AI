@@ -15,16 +15,24 @@ export function notificationsRouter(db?: Database) {
         return;
       }
 
-      console.log(`[EMAIL NOTIFICATION SENT TO ${TARGET_EMAIL}]`);
+      const recipient = data.recipient_email || data.email || TARGET_EMAIL;
+
+      console.log(`[EMAIL NOTIFICATION DISPATCHED TO ${recipient}]`);
       console.log(`Type: ${type}`);
       console.log(`Payload:`, JSON.stringify(data, null, 2));
+
+      let typeLabel = 'Notificação Sanitária';
+      if (type === 'evaluation') typeLabel = 'Avaliação de Região';
+      else if (type === 'bug_report') typeLabel = 'Erro Técnico';
+      else if (type === 'quiz_certificate') typeLabel = 'Certificado & Relatório de Desempenho do Agente de Saúde';
+      else if (type === 'suggestion') typeLabel = 'Sugestão / Feedback';
 
       // Return successful simulation payload with destination email
       res.json({
         success: true,
-        target_email: TARGET_EMAIL,
+        target_email: recipient,
         type,
-        message: `Relatório de ${type === 'evaluation' ? 'Avaliação de Região' : type === 'bug_report' ? 'Erro Técnico' : 'Sugestão'} enviado com sucesso para ${TARGET_EMAIL}`,
+        message: `${typeLabel} enviado com sucesso para ${recipient}`,
         timestamp: new Date().toISOString()
       });
     } catch (error: any) {

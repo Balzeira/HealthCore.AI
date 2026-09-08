@@ -79,6 +79,14 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
           </NavLink>
 
           <NavLink 
+            to="/diseases" 
+            className={({ isActive }) => `header-nav-item ${isActive ? 'active' : ''}`}
+          >
+            <span className="nav-icon">🦠</span>
+            <span className="nav-label">Doenças</span>
+          </NavLink>
+
+          <NavLink 
             to="/form/evaluation" 
             className={({ isActive }) => `header-nav-item ${isActive ? 'active' : ''}`}
           >

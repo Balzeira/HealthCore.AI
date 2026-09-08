@@ -8,6 +8,7 @@ import SplashScreen from './components/SplashScreen';
 import HomePage from './pages/HomePage';
 import MapPage from './pages/MapPage';
 import FacilitiesPage from './pages/FacilitiesPage';
+import DiseasesPage from './pages/DiseasesPage';
 import EvaluationFormPage from './pages/EvaluationFormPage';
 import PredispositionFormPage from './pages/PredispositionFormPage';
 import GamePage from './pages/GamePage';
@@ -84,6 +85,7 @@ export const App = () => {
         { path: "/", element: <HomePage /> },
         { path: "/map", element: <MapPage /> },
         { path: "/map/facilities", element: <FacilitiesPage /> },
+        { path: "/diseases", element: <DiseasesPage /> },
         { path: "/form/evaluation", element: <EvaluationFormPage /> },
         { path: "/form/predisposition", element: <PredispositionFormPage /> },
         { path: "/game", element: <GamePage /> },
