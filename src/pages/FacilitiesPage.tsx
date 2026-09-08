@@ -1,12 +1,30 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ALL_SP_HOSPITALS, Hospital } from '../data/hospitalsData';
 
 export default function FacilitiesPage() {
-  // Authoritative catalog of all 56 SP hospitals with verified zones and CNES metadata
+  const location = useLocation();
+  // Authoritative catalog of all SP hospitals with verified zones and CNES metadata
   const [hospitals] = useState<Hospital[]>(ALL_SP_HOSPITALS);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedZone, setSelectedZone] = useState('Todas');
   const [filterType, setFilterType] = useState<string>('Todos');
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const searchParam = params.get('search');
+    const hospitalIdParam = params.get('hospitalId');
+    if (hospitalIdParam) {
+      const found = ALL_SP_HOSPITALS.find(h => h.id === Number(hospitalIdParam));
+      if (found) {
+        setSearchQuery(found.name);
+        return;
+      }
+    }
+    if (searchParam) {
+      setSearchQuery(searchParam);
+    }
+  }, [location.search]);
 
   // Helper: strict type matching based on network field
   const matchesTypeFilter = (h: Hospital, t: string): boolean => {
