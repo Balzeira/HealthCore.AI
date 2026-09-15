@@ -310,35 +310,57 @@ export default function GamePage() {
     try {
       const correctCount = answers.filter(a => a.is_correct).length;
       const accuracyPercent = Math.round((correctCount / questions.length) * 100);
+      const issueDate = new Date().toLocaleDateString('pt-BR');
+      const issueTime = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-      const payload = {
-        recipient_email: emailInput,
-        student_name: user.name || 'Agente de Saúde',
-        role: user.role || 'Agente Comunitário',
-        district: user.district || 'São Paulo',
-        score: score,
-        accuracy: `${accuracyPercent}%`,
-        completion_time: formatTimer(timer),
-        completion_date: new Date().toLocaleDateString('pt-BR'),
-        questions_answered: questions.length,
-        correct_answers: correctCount
-      };
+      // Build question breakdown for the email body
+      const questionDetails = questions.map((q, idx) => {
+        const userAns = answers.find(a => a.question_id === q.id);
+        const isCorrect = userAns ? userAns.is_correct : false;
+        return `Q${idx + 1} (${q.category}): ${isCorrect ? 'ACERTOU ✓' : 'ERROU ✕'} - ${q.text}`;
+      }).join('\n');
 
-      await api.post('/notifications/email', {
-        type: 'quiz_certificate',
-        data: payload
+      // 1. Dispatch real email via FormSubmit API
+      const res = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(emailInput.trim())}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          _subject: `🎓 Certificado & Relatório de Desempenho - HealthCore.AI (${user.name || 'Agente'})`,
+          _template: 'table',
+          '👤 Nome do Agente': user.name || 'Agente de Saúde',
+          '💼 Cargo / Função': user.role || 'Agente Comunitário',
+          '📍 Região / Bairro': user.district || 'São Paulo - Capital',
+          '🏆 Pontuação Final': `${score} de 1000 pontos`,
+          '📊 Aproveitamento': `${accuracyPercent}% (${correctCount} de ${questions.length} acertos)`,
+          '⏱️ Tempo de Prova': formatTimer(timer),
+          '📅 Data e Hora de Emissão': `${issueDate} às ${issueTime}`,
+          '📋 Detalhamento das Questões': questionDetails,
+          '🏥 Instituição Emissora': 'HealthCore.AI — Vigilância e Capacitação em Saúde Urbana SP',
+          '🔑 Código de Registro Oficial': 'REG-HC-EDU-2026'
+        })
       });
 
-      setEmailSuccessMsg(`Relatório e certificado enviados com sucesso para ${emailInput}!`);
+      // Also notify local API if available
+      api.post('/notifications/email', {
+        type: 'quiz_certificate',
+        data: {
+          recipient_email: emailInput,
+          student_name: user.name,
+          score,
+          accuracy: `${accuracyPercent}%`
+        }
+      }).catch(() => {});
+
+      setEmailSuccessMsg(`Relatório e certificado enviados com sucesso para ${emailInput}! Verifique sua caixa de entrada (e pasta de Spam/Lixo Eletrônico).`);
       setTimeout(() => {
         setIsEmailModalOpen(false);
-      }, 2500);
+      }, 3500);
     } catch (err: any) {
-      console.warn('Fallback simulated email response:', err);
-      setEmailSuccessMsg(`Relatório e certificado despachados para ${emailInput}!`);
-      setTimeout(() => {
-        setIsEmailModalOpen(false);
-      }, 2500);
+      console.warn('Email dispatch warning:', err);
+      setEmailSuccessMsg(`Relatório processado para ${emailInput}! Caso não receba em instantes, utilize o botão de e-mail direto abaixo.`);
     } finally {
       setIsSendingEmail(false);
     }
@@ -812,17 +834,28 @@ export default function GamePage() {
               </p>
 
               {emailSuccessMsg ? (
-                <div style={{
-                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                  border: '1px solid rgba(16, 185, 129, 0.4)',
-                  color: '#34D399',
-                  padding: '14px',
-                  borderRadius: '12px',
-                  fontSize: '0.9rem',
-                  fontWeight: 800,
-                  textAlign: 'center'
-                }}>
-                  ✓ {emailSuccessMsg}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{
+                    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                    color: '#34D399',
+                    padding: '16px',
+                    borderRadius: '12px',
+                    fontSize: '0.9rem',
+                    fontWeight: 800,
+                    lineHeight: 1.5,
+                    textAlign: 'center'
+                  }}>
+                    ✓ {emailSuccessMsg}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsEmailModalOpen(false)}
+                    className="btn-primary"
+                    style={{ width: '100%', padding: '12px', borderRadius: '10px' }}
+                  >
+                    Concluir
+                  </button>
                 </div>
               ) : (
                 <form onSubmit={handleSendEmail} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -847,9 +880,12 @@ export default function GamePage() {
                         outline: 'none'
                       }}
                     />
+                    <span style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '4px', display: 'block' }}>
+                      O relatório oficial será entregue diretamente na sua caixa de entrada.
+                    </span>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>
                     <button
                       type="button"
                       onClick={() => setIsEmailModalOpen(false)}
@@ -868,20 +904,47 @@ export default function GamePage() {
                     </button>
                     <button
                       type="submit"
-                      disabled={isSendingEmail}
+                      disabled={isSendingEmail || !emailInput}
                       className="btn-primary"
                       style={{
-                        padding: '10px 20px',
+                        padding: '10px 22px',
                         fontSize: '0.9rem',
                         borderRadius: '10px',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        opacity: isSendingEmail ? 0.7 : 1
+                        opacity: isSendingEmail ? 0.7 : 1,
+                        cursor: isSendingEmail ? 'not-allowed' : 'pointer'
                       }}
                     >
-                      {isSendingEmail ? 'Enviando...' : 'Confirmar Envio ✉️'}
+                      {isSendingEmail ? 'Disparando E-mail...' : 'Disparar Relatório para E-mail ✉️'}
                     </button>
+                  </div>
+
+                  {/* Mailto Direct App Fallback */}
+                  <div style={{ borderTop: '1px solid #1E293B', paddingTop: '12px', textAlign: 'center' }}>
+                    <a
+                      href={`mailto:${encodeURIComponent(emailInput || '')}?subject=${encodeURIComponent(`🎓 Certificado & Relatório HealthCore.AI (${user.name || 'Agente'})`)}&body=${encodeURIComponent(
+                        `CERTIFICADO & RELATÓRIO OFICIAL DE CAPACITAÇÃO - HEALTHCORE.AI\n\n` +
+                        `Nome do Agente: ${user.name || 'Agente de Saúde'}\n` +
+                        `Cargo / Função: ${user.role || 'Agente Comunitário'}\n` +
+                        `Região / Bairro: ${user.district || 'São Paulo'}\n` +
+                        `Pontuação: ${score} de 1000 pontos\n` +
+                        `Aproveitamento: ${Math.round((answers.filter(a => a.is_correct).length / questions.length) * 100)}%\n` +
+                        `Tempo de Conclusão: ${formatTimer(timer)}\n` +
+                        `Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}\n` +
+                        `Código de Registro: REG-HC-EDU-2026\n\n` +
+                        `Emitido por HealthCore.AI — Sistema de Inteligência em Saúde Urbana SP`
+                      )}`}
+                      style={{
+                        fontSize: '0.78rem',
+                        color: '#60A5FA',
+                        textDecoration: 'underline',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Ou abrir direto no seu aplicativo de e-mail (Gmail / Outlook) ↗
+                    </a>
                   </div>
                 </form>
               )}
