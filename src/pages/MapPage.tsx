@@ -156,25 +156,28 @@ export default function MapPage() {
     }
   }, [location.search, userRegisteredDistrictName]);
 
-  const basemapUrls: Record<string, { url: string; subdomains?: string; className?: string; attribution: string }> = {
+  const basemapUrls: Record<string, { url: string; subdomains?: string[]; className?: string; attribution: string }> = {
     dark: {
-      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-      attribution: '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Esri, DeLorme, NAVTEQ'
+      url: 'https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+      className: 'leaflet-google-dark',
+      attribution: '&copy; Google Maps'
     },
     satellite: {
-      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP'
+      url: 'https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+      attribution: '&copy; Google Maps'
     },
     street: {
-      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      subdomains: 'abc',
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      url: 'https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+      attribution: '&copy; Google Maps'
     },
     voyager: {
-      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      subdomains: 'abc',
-      className: 'leaflet-tile-dark',
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      url: 'https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+      className: 'leaflet-google-night',
+      attribution: '&copy; Google Maps'
     }
   };
 
@@ -1014,11 +1017,11 @@ export default function MapPage() {
             style={{ height: '100%', width: '100%', minHeight: isFullscreen ? '100vh' : '720px', backgroundColor: '#070B14' }}
             zoomControl={false}
           >
-            {/* Dynamic Basemap Tile Layer (Dark Obsidian, Satellite HD, Street, Voyager) */}
+            {/* Dynamic Basemap Tile Layer (Google Maps Dark / Google Satellite / Google Street) */}
             <TileLayer
               key={basemap}
               url={basemapUrls[basemap].url}
-              subdomains={basemapUrls[basemap].subdomains || 'abc'}
+              subdomains={basemapUrls[basemap].subdomains || ['mt0', 'mt1', 'mt2', 'mt3']}
               className={basemapUrls[basemap].className || ''}
               maxZoom={20}
               attribution={basemapUrls[basemap].attribution}
