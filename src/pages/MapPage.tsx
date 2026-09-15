@@ -125,7 +125,7 @@ export default function MapPage() {
   const [filterRisk, setFilterRisk] = useState<string>('Todos');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [hospitalFilter, setHospitalFilter] = useState<string>('Todos');
-  const [pinMode, setPinMode] = useState<'auto' | 'region' | 'all' | 'none'>('auto');
+  const [pinMode, setPinMode] = useState<'region' | 'all' | 'none'>('region');
   const [basemap, setBasemap] = useState<'dark' | 'satellite' | 'street' | 'voyager'>('dark');
   const [mapLayerMode, setMapLayerMode] = useState<'all' | 'risk' | 'hospitals'>('all');
   const [polygonOpacity, setPolygonOpacity] = useState<number>(0.38);
@@ -229,54 +229,33 @@ export default function MapPage() {
     });
   }, [hudScope, selectedDistrict, filterZone, hospitalFilter]);
 
-  // Map Pins: Smart filtering based on zoom level and area (reduces visual pollution)
+  // Map Pins: Strictly shows ONLY the hospitals of the selected region/district
   const mapVisibleHospitals = useMemo(() => {
     if (pinMode === 'none') return [];
 
     let base: Hospital[] = [];
 
-    if (pinMode === 'auto') {
-      // Zoom inteligente:
-      // Se zoom for menor que 13 (visão macro de toda SP):
-      // Não polui o mapa com dezenas de ícones sobrepostos!
-      // Mostra apenas o hospital que foi clicado ou os hospitais do bairro selecionado
-      if (currentZoom < 13) {
-        if (selectedHospital) {
-          base = [selectedHospital];
-        } else if (hudScope === 'district' && selectedDistrict?.hospitalIds) {
-          base = ALL_SP_HOSPITALS.filter(h => selectedDistrict.hospitalIds.includes(h.id));
-        } else if (filterZone !== 'Todas') {
-          base = ALL_SP_HOSPITALS.filter(h => (h?.zone || '').trim().toLowerCase() === filterZone.trim().toLowerCase());
-        } else {
-          // Visão panorâmica de SP geral: limpa o mapa para visualização dos polígonos de risco
-          base = [];
-        }
-      } else {
-        // Zoom >= 13 (área aproximada do bairro/zona): mostra os hospitais presentes na área visível
-        if (currentBounds) {
-          base = ALL_SP_HOSPITALS.filter(h => currentBounds.contains([h.latitude, h.longitude]));
-        } else if (filterZone !== 'Todas') {
-          base = ALL_SP_HOSPITALS.filter(h => (h?.zone || '').trim().toLowerCase() === filterZone.trim().toLowerCase());
-        } else if (selectedDistrict?.hospitalIds) {
-          base = ALL_SP_HOSPITALS.filter(h => selectedDistrict.hospitalIds.includes(h.id));
-        } else {
-          base = ALL_SP_HOSPITALS;
-        }
-      }
-    } else if (pinMode === 'region') {
+    if (pinMode === 'region') {
+      // Exibe ESTRITAMENTE apenas os hospitais do bairro/distrito ou da zona selecionada
       if (hudScope === 'district' && selectedDistrict?.hospitalIds) {
         base = ALL_SP_HOSPITALS.filter(h => selectedDistrict.hospitalIds.includes(h.id));
       } else if (filterZone !== 'Todas') {
         base = ALL_SP_HOSPITALS.filter(h => (h?.zone || '').trim().toLowerCase() === filterZone.trim().toLowerCase());
       } else {
-        base = ALL_SP_HOSPITALS.filter(h => [101, 102, 201, 204, 301, 306, 401, 405, 501, 510].includes(h.id));
+        // Se estiver em Visão Geral (SP inteira), foca no bairro selecionado
+        base = selectedDistrict?.hospitalIds ? ALL_SP_HOSPITALS.filter(h => selectedDistrict.hospitalIds.includes(h.id)) : [];
       }
     } else if (pinMode === 'all') {
-      if (currentBounds && currentZoom >= 13) {
-        base = ALL_SP_HOSPITALS.filter(h => currentBounds.contains([h.latitude, h.longitude]));
+      if (filterZone !== 'Todas') {
+        base = ALL_SP_HOSPITALS.filter(h => (h?.zone || '').trim().toLowerCase() === filterZone.trim().toLowerCase());
       } else {
         base = ALL_SP_HOSPITALS;
       }
+    }
+
+    // Se o usuário selecionou um hospital específico no HUD, garante que ele apareça no mapa
+    if (selectedHospital && !base.some(h => h.id === selectedHospital.id)) {
+      base = [...base, selectedHospital];
     }
 
     return base.filter(h => {
@@ -287,7 +266,7 @@ export default function MapPage() {
       if (hospitalFilter === 'Filantrópico') return h?.network === 'Filantrópico';
       return true;
     });
-  }, [pinMode, currentZoom, currentBounds, selectedHospital, hudScope, selectedDistrict, filterZone, hospitalFilter]);
+  }, [pinMode, hudScope, selectedDistrict, filterZone, selectedHospital, hospitalFilter]);
 
   const handleSelectDistrict = (d: SPDistrictRegion) => {
     setSelectedDistrict(d);
