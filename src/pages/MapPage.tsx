@@ -156,11 +156,10 @@ export default function MapPage() {
     }
   }, [location.search, userRegisteredDistrictName]);
 
-  const basemapUrls: Record<string, { url: string; subdomains?: string; attribution: string }> = {
+  const basemapUrls: Record<string, { url: string; subdomains?: string; className?: string; attribution: string }> = {
     dark: {
-      url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-      subdomains: 'abcd',
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+      attribution: '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Esri, DeLorme, NAVTEQ'
     },
     satellite: {
       url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -172,9 +171,10 @@ export default function MapPage() {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     },
     voyager: {
-      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-      subdomains: 'abcd',
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      subdomains: 'abc',
+      className: 'leaflet-tile-dark',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }
   };
 
@@ -1019,6 +1019,7 @@ export default function MapPage() {
               key={basemap}
               url={basemapUrls[basemap].url}
               subdomains={basemapUrls[basemap].subdomains || 'abc'}
+              className={basemapUrls[basemap].className || ''}
               maxZoom={20}
               attribution={basemapUrls[basemap].attribution}
             />

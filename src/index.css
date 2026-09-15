@@ -741,3 +741,13 @@ p { font-size: 1rem; color: var(--text-secondary); line-height: 1.6; }
   }
 }
 
+/* Custom Basemap Tile Filters - 100% Free, Zero API Keys, No Watermarks */
+.leaflet-tile-dark {
+  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(100%) !important;
+}
+
+.leaflet-tile-night {
+  filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.35) brightness(0.75) !important;
+}
+
+
