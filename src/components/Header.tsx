@@ -56,26 +56,29 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
           </div>
         </div>
 
-        {/* 2. Center Hamburger Toggle Button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* Right Status & Navigation & User Account Section */}
+        <div className="header-user-section" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Hamburger Toggle Button (Icon Only, next to Monitoramento SP) */}
           <button
             type="button"
             className={`header-hamburger-btn ${menuOpen ? 'active' : ''}`}
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label={menuOpen ? 'Fechar menu de navegação' : 'Abrir menu de navegação'}
-            title="Menu de navegação"
+            title={menuOpen ? 'Fechar Menu' : 'Menu de Navegação'}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '10px',
+              justifyContent: 'center',
+              width: '40px',
+              height: '40px',
               backgroundColor: menuOpen ? 'rgba(37, 99, 235, 0.25)' : 'rgba(15, 23, 42, 0.9)',
               border: `1.5px solid ${menuOpen ? '#3B82F6' : '#334155'}`,
-              borderRadius: '12px',
-              padding: '8px 16px',
+              borderRadius: '10px',
               color: '#FFFFFF',
               cursor: 'pointer',
               boxShadow: menuOpen ? '0 0 16px rgba(59, 130, 246, 0.35)' : '0 2px 8px rgba(0,0,0,0.3)',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              flexShrink: 0
             }}
           >
             {/* Animated Hamburger Icon */}
@@ -115,14 +118,8 @@ export const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
                 transform: menuOpen ? 'rotate(-45deg) translate(4px, -5px)' : 'none'
               }} />
             </div>
-            <span style={{ fontSize: '0.9rem', fontWeight: 800, letterSpacing: '0.2px' }}>
-              {menuOpen ? 'Fechar Menu' : 'Menu de Opções'}
-            </span>
           </button>
-        </div>
 
-        {/* 3. Right Status & User Account Section */}
-        <div className="header-user-section">
           {/* Compact Live Status Dot */}
           <div className="header-live-badge-compact" title="96 Distritos e 32 Subprefeituras de SP Monitoradas">
             <span className="header-live-dot"></span>
