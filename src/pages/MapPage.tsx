@@ -204,13 +204,26 @@ export default function MapPage() {
 
   const [hudScope, setHudScope] = useState<'zone' | 'district'>('zone');
 
+  // Strict point-in-polygon geometric algorithm
+  const isPointInPolygon = (pt: [number, number], vs: [number, number][]) => {
+    const x = pt[0], y = pt[1];
+    let inside = false;
+    for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+      const xi = vs[i][0], yi = vs[i][1];
+      const xj = vs[j][0], yj = vs[j][1];
+      const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  };
+
   // HUD Hospitals calculation:
-  // When hudScope === 'district', shows hospitals in selectedDistrict.
-  // When hudScope === 'zone', shows all hospitals in filterZone.
+  // When hudScope === 'district', strictly shows hospitals inside selectedDistrict polygon
+  // When hudScope === 'zone', shows all hospitals in filterZone
   const hudHospitals = useMemo(() => {
     let list: Hospital[] = [];
-    if (hudScope === 'district' && selectedDistrict?.hospitalIds) {
-      list = ALL_SP_HOSPITALS.filter(h => selectedDistrict.hospitalIds.includes(h.id));
+    if (hudScope === 'district' && selectedDistrict) {
+      list = ALL_SP_HOSPITALS.filter(h => isPointInPolygon([h.latitude, h.longitude], selectedDistrict.polygon));
     } else {
       const targetZone = filterZone.trim().toLowerCase();
       list = ALL_SP_HOSPITALS.filter(h => {
@@ -230,20 +243,25 @@ export default function MapPage() {
   }, [hudScope, selectedDistrict, filterZone, hospitalFilter]);
 
   // Map Pins: Strictly shows ONLY the hospitals of the selected region/district
+  // AND hides them automatically when zooming out to macro city view (currentZoom < 12.5)
   const mapVisibleHospitals = useMemo(() => {
     if (pinMode === 'none') return [];
+
+    // Quando o usuário tira o zoom para visão panorâmica de SP, esconde os pins para evitar sobreposição
+    if (currentZoom < 12.5 && !selectedHospital) {
+      return [];
+    }
 
     let base: Hospital[] = [];
 
     if (pinMode === 'region') {
-      // Exibe ESTRITAMENTE apenas os hospitais do bairro/distrito ou da zona selecionada
-      if (hudScope === 'district' && selectedDistrict?.hospitalIds) {
-        base = ALL_SP_HOSPITALS.filter(h => selectedDistrict.hospitalIds.includes(h.id));
+      if (hudScope === 'district' && selectedDistrict) {
+        // Rigorosamente apenas os hospitais que estão DENTRO do polígono do distrito selecionado
+        base = ALL_SP_HOSPITALS.filter(h => isPointInPolygon([h.latitude, h.longitude], selectedDistrict.polygon));
       } else if (filterZone !== 'Todas') {
         base = ALL_SP_HOSPITALS.filter(h => (h?.zone || '').trim().toLowerCase() === filterZone.trim().toLowerCase());
       } else {
-        // Se estiver em Visão Geral (SP inteira), foca no bairro selecionado
-        base = selectedDistrict?.hospitalIds ? ALL_SP_HOSPITALS.filter(h => selectedDistrict.hospitalIds.includes(h.id)) : [];
+        base = [];
       }
     } else if (pinMode === 'all') {
       if (filterZone !== 'Todas') {
@@ -253,7 +271,7 @@ export default function MapPage() {
       }
     }
 
-    // Se o usuário selecionou um hospital específico no HUD, garante que ele apareça no mapa
+    // Se o usuário selecionou um hospital específico no HUD lateral, exibe seu pin
     if (selectedHospital && !base.some(h => h.id === selectedHospital.id)) {
       base = [...base, selectedHospital];
     }
@@ -266,7 +284,7 @@ export default function MapPage() {
       if (hospitalFilter === 'Filantrópico') return h?.network === 'Filantrópico';
       return true;
     });
-  }, [pinMode, hudScope, selectedDistrict, filterZone, selectedHospital, hospitalFilter]);
+  }, [pinMode, hudScope, selectedDistrict, filterZone, selectedHospital, hospitalFilter, currentZoom]);
 
   const handleSelectDistrict = (d: SPDistrictRegion) => {
     setSelectedDistrict(d);

@@ -174,9 +174,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.000 hab",
     "areaKm2": 4.5,
     "hospitalIds": [
-      294,
-      307,
-      310
+      294
     ]
   },
   {
@@ -291,9 +289,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.037 hab",
     "areaKm2": 11.5,
     "hospitalIds": [
-      310,
-      226,
-      294
+      310
     ]
   },
   {
@@ -528,9 +524,9 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.074 hab",
     "areaKm2": 18.5,
     "hospitalIds": [
-      309,
+      291,
       307,
-      291
+      309
     ]
   },
   {
@@ -758,8 +754,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 25.5,
     "hospitalIds": [
       295,
-      302,
-      291
+      302
     ]
   },
   {
@@ -910,8 +905,6 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.148 hab",
     "areaKm2": 7.5,
     "hospitalIds": [
-      295,
-      302,
       312
     ]
   },
@@ -1027,9 +1020,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.185 hab",
     "areaKm2": 14.5,
     "hospitalIds": [
-      303,
-      292,
-      313
+      303
     ]
   },
   {
@@ -1244,9 +1235,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.222 hab",
     "areaKm2": 21.5,
     "hospitalIds": [
-      292,
-      302,
-      295
+      292
     ]
   },
   {
@@ -1345,9 +1334,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.259 hab",
     "areaKm2": 28.5,
     "hospitalIds": [
-      292,
-      313,
-      302
+      313
     ]
   },
   {
@@ -1466,9 +1453,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.296 hab",
     "areaKm2": 10.5,
     "hospitalIds": [
-      314,
-      305,
-      311
+      314
     ]
   },
   {
@@ -1591,9 +1576,14 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.333 hab",
     "areaKm2": 17.5,
     "hospitalIds": [
-      305,
+      230,
+      232,
+      247,
+      248,
+      249,
       296,
-      314
+      305,
+      365
     ]
   },
   {
@@ -1700,9 +1690,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.370 hab",
     "areaKm2": 24.5,
     "hospitalIds": [
-      311,
-      296,
-      314
+      311
     ]
   },
   {
@@ -1801,9 +1789,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.407 hab",
     "areaKm2": 6.5,
     "hospitalIds": [
-      315,
-      261,
-      338
+      315
     ]
   },
   {
@@ -1910,8 +1896,6 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.444 hab",
     "areaKm2": 13.5,
     "hospitalIds": [
-      316,
-      317,
       268
     ]
   },
@@ -2103,9 +2087,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.481 hab",
     "areaKm2": 20.5,
     "hospitalIds": [
-      278,
-      316,
-      318
+      316
     ]
   },
   {
@@ -2216,9 +2198,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.518 hab",
     "areaKm2": 27.5,
     "hospitalIds": [
-      268,
-      317,
-      275
+      317
     ]
   },
   {
@@ -2301,9 +2281,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.555 hab",
     "areaKm2": 9.5,
     "hospitalIds": [
-      318,
-      272,
-      278
+      318
     ]
   },
   {
@@ -2427,8 +2405,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 16.5,
     "hospitalIds": [
       272,
-      278,
-      318
+      278
     ]
   },
   {
@@ -2543,9 +2520,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.629 hab",
     "areaKm2": 23.5,
     "hospitalIds": [
-      285,
-      319,
-      282
+      285
     ]
   },
   {
@@ -2688,9 +2663,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.666 hab",
     "areaKm2": 5.5,
     "hospitalIds": [
-      284,
       267,
-      319
+      284
     ]
   },
   {
@@ -2818,8 +2792,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 12.5,
     "hospitalIds": [
       265,
-      282,
-      356
+      282
     ]
   },
   {
@@ -2966,9 +2939,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.740 hab",
     "areaKm2": 19.5,
     "hospitalIds": [
-      319,
-      282,
-      265
+      319
     ]
   },
   {
@@ -3051,9 +3022,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.777 hab",
     "areaKm2": 26.5,
     "hospitalIds": [
-      223,
-      313,
-      220
+      108
     ]
   },
   {
@@ -3157,7 +3126,6 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 8.5,
     "hospitalIds": [
       206,
-      342,
       223
     ]
   },
@@ -3229,9 +3197,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.851 hab",
     "areaKm2": 15.5,
     "hospitalIds": [
-      208,
-      320,
-      218
+      320
     ]
   },
   {
@@ -3334,9 +3300,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.888 hab",
     "areaKm2": 22.5,
     "hospitalIds": [
-      226,
-      310,
-      320
+      226
     ]
   },
   {
@@ -3440,8 +3404,10 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 4.5,
     "hospitalIds": [
       207,
+      208,
       214,
-      218
+      218,
+      220
     ]
   },
   {
@@ -3524,9 +3490,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.962 hab",
     "areaKm2": 11.5,
     "hospitalIds": [
-      225,
-      320,
-      210
+      225
     ]
   },
   {
@@ -3597,9 +3561,9 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "45.999 hab",
     "areaKm2": 18.5,
     "hospitalIds": [
-      122,
       110,
-      120
+      112,
+      122
     ]
   },
   {
@@ -3674,9 +3638,9 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.036 hab",
     "areaKm2": 25.5,
     "hospitalIds": [
-      108,
-      123,
-      112
+      101,
+      116,
+      123
     ]
   },
   {
@@ -3748,8 +3712,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 7.5,
     "hospitalIds": [
       120,
-      110,
-      122
+      277,
+      289
     ]
   },
   {
@@ -3804,9 +3768,15 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.110 hab",
     "areaKm2": 14.5,
     "hospitalIds": [
-      106,
       102,
-      103
+      103,
+      104,
+      105,
+      106,
+      113,
+      115,
+      118,
+      121
     ]
   },
   {
@@ -3869,9 +3839,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.147 hab",
     "areaKm2": 21.5,
     "hospitalIds": [
-      112,
-      321,
-      371
+      114
     ]
   },
   {
@@ -3970,9 +3938,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.184 hab",
     "areaKm2": 28.5,
     "hospitalIds": [
-      109,
-      124,
-      244
+      109
     ]
   },
   {
@@ -4047,9 +4013,10 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.221 hab",
     "areaKm2": 10.5,
     "hospitalIds": [
+      107,
+      111,
       117,
-      125,
-      111
+      125
     ]
   },
   {
@@ -4128,8 +4095,6 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.258 hab",
     "areaKm2": 17.5,
     "hospitalIds": [
-      109,
-      113,
       124
     ]
   },
@@ -4209,9 +4174,9 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.295 hab",
     "areaKm2": 24.5,
     "hospitalIds": [
-      287,
+      274,
       276,
-      362
+      287
     ]
   },
   {
@@ -4278,9 +4243,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.332 hab",
     "areaKm2": 6.5,
     "hospitalIds": [
-      321,
-      323,
-      114
+      321
     ]
   },
   {
@@ -4375,9 +4338,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.369 hab",
     "areaKm2": 13.5,
     "hospitalIds": [
-      270,
       260,
-      322
+      270
     ]
   },
   {
@@ -4484,9 +4446,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.406 hab",
     "areaKm2": 20.5,
     "hospitalIds": [
-      322,
-      286,
-      270
+      322
     ]
   },
   {
@@ -4566,8 +4526,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 27.5,
     "hospitalIds": [
       271,
-      279,
-      114
+      279
     ]
   },
   {
@@ -4642,9 +4601,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.480 hab",
     "areaKm2": 9.5,
     "hospitalIds": [
-      323,
-      321,
-      120
+      323
     ]
   },
   {
@@ -4783,9 +4740,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.517 hab",
     "areaKm2": 16.5,
     "hospitalIds": [
-      275,
-      324,
-      270
+      275
     ]
   },
   {
@@ -4928,9 +4883,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.554 hab",
     "areaKm2": 23.5,
     "hospitalIds": [
-      324,
-      275,
-      270
+      324
     ]
   },
   {
@@ -5017,9 +4970,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.591 hab",
     "areaKm2": 5.5,
     "hospitalIds": [
-      325,
-      380,
-      324
+      325
     ]
   },
   {
@@ -5191,8 +5142,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 12.5,
     "hospitalIds": [
       264,
-      273,
-      262
+      273
     ]
   },
   {
@@ -5319,9 +5269,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.665 hab",
     "areaKm2": 19.5,
     "hospitalIds": [
-      326,
-      327,
-      264
+      326
     ]
   },
   {
@@ -5512,9 +5460,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.702 hab",
     "areaKm2": 26.5,
     "hospitalIds": [
-      327,
-      263,
-      281
+      327
     ]
   },
   {
@@ -5633,9 +5579,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.739 hab",
     "areaKm2": 8.5,
     "hospitalIds": [
-      286,
-      328,
-      287
+      286
     ]
   },
   {
@@ -5762,9 +5706,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.776 hab",
     "areaKm2": 15.5,
     "hospitalIds": [
-      328,
-      325,
-      286
+      328
     ]
   },
   {
@@ -5864,8 +5806,10 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 22.5,
     "hospitalIds": [
       205,
+      211,
+      212,
       222,
-      211
+      227
     ]
   },
   {
@@ -6048,9 +5992,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.850 hab",
     "areaKm2": 4.5,
     "hospitalIds": [
-      210,
-      216,
-      341
+      210
     ]
   },
   {
@@ -6174,8 +6116,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 11.5,
     "hospitalIds": [
       215,
-      339,
-      222
+      339
     ]
   },
   {
@@ -6318,9 +6259,11 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.924 hab",
     "areaKm2": 18.5,
     "hospitalIds": [
-      209,
       204,
-      215
+      209,
+      213,
+      221,
+      340
     ]
   },
   {
@@ -6495,9 +6438,9 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.961 hab",
     "areaKm2": 25.5,
     "hospitalIds": [
+      216,
       217,
-      341,
-      216
+      341
     ]
   },
   {
@@ -6596,9 +6539,13 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "46.998 hab",
     "areaKm2": 7.5,
     "hospitalIds": [
-      342,
       201,
-      202
+      202,
+      203,
+      219,
+      224,
+      342,
+      343
     ]
   },
   {
@@ -6680,11 +6627,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "air": 4.3,
     "population": "47.035 hab",
     "areaKm2": 14.5,
-    "hospitalIds": [
-      219,
-      214,
-      207
-    ]
+    "hospitalIds": []
   },
   {
     "id": 57,
@@ -6770,9 +6713,10 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "47.072 hab",
     "areaKm2": 21.5,
     "hospitalIds": [
+      228,
       240,
-      344,
-      228
+      251,
+      344
     ]
   },
   {
@@ -6847,9 +6791,9 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "47.109 hab",
     "areaKm2": 28.5,
     "hospitalIds": [
-      201,
-      224,
-      202
+      119,
+      229,
+      345
     ]
   },
   {
@@ -6984,8 +6928,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "47.146 hab",
     "areaKm2": 10.5,
     "hospitalIds": [
-      252,
       235,
+      252,
       346
     ]
   },
@@ -7157,9 +7101,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "47.183 hab",
     "areaKm2": 17.5,
     "hospitalIds": [
-      347,
       329,
-      256
+      347
     ]
   },
   {
@@ -7262,9 +7205,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "47.220 hab",
     "areaKm2": 24.5,
     "hospitalIds": [
-      348,
       330,
-      222
+      348
     ]
   },
   {
@@ -7571,8 +7513,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "47.257 hab",
     "areaKm2": 6.5,
     "hospitalIds": [
-      256,
       234,
+      256,
       349
     ]
   },
@@ -7749,8 +7691,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 13.5,
     "hospitalIds": [
       257,
-      350,
-      349
+      350
     ]
   },
   {
@@ -7838,7 +7779,6 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 20.5,
     "hospitalIds": [
       255,
-      374,
       351
     ]
   },
@@ -8006,9 +7946,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "47.368 hab",
     "areaKm2": 27.5,
     "hospitalIds": [
-      352,
       331,
-      236
+      352
     ]
   },
   {
@@ -8199,9 +8138,9 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "47.405 hab",
     "areaKm2": 9.5,
     "hospitalIds": [
-      355,
+      236,
       242,
-      238
+      353
     ]
   },
   {
@@ -8937,8 +8876,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 16.5,
     "hospitalIds": [
       259,
-      354,
-      243
+      354
     ]
   },
   {
@@ -9421,8 +9359,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "47.479 hab",
     "areaKm2": 23.5,
     "hospitalIds": [
-      243,
       238,
+      243,
       355
     ]
   },
@@ -9602,8 +9540,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "47.516 hab",
     "areaKm2": 5.5,
     "hospitalIds": [
-      281,
       263,
+      281,
       356
     ]
   },
@@ -9856,8 +9794,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 12.5,
     "hospitalIds": [
       300,
-      357,
-      309
+      357
     ]
   },
   {
@@ -10156,9 +10093,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "47.590 hab",
     "areaKm2": 19.5,
     "hospitalIds": [
-      358,
-      357,
-      332
+      332,
+      358
     ]
   },
   {
@@ -10333,9 +10269,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "47.627 hab",
     "areaKm2": 26.5,
     "hospitalIds": [
-      359,
       262,
-      325
+      359
     ]
   },
   {
@@ -10455,8 +10390,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 8.5,
     "hospitalIds": [
       258,
-      333,
-      361
+      360
     ]
   },
   {
@@ -10620,8 +10554,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 15.5,
     "hospitalIds": [
       333,
-      361,
-      258
+      361
     ]
   },
   {
@@ -10728,8 +10661,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "47.738 hab",
     "areaKm2": 22.5,
     "hospitalIds": [
-      245,
       244,
+      245,
       362
     ]
   },
@@ -10814,8 +10747,9 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 4.5,
     "hospitalIds": [
       231,
-      247,
-      246
+      246,
+      250,
+      363
     ]
   },
   {
@@ -10894,9 +10828,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "47.812 hab",
     "areaKm2": 11.5,
     "hospitalIds": [
-      230,
-      365,
-      254
+      254,
+      364
     ]
   },
   {
@@ -10986,11 +10919,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "air": 2.8,
     "population": "47.849 hab",
     "areaKm2": 18.5,
-    "hospitalIds": [
-      248,
-      229,
-      232
-    ]
+    "hospitalIds": []
   },
   {
     "id": 79,
@@ -11152,9 +11081,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "47.886 hab",
     "areaKm2": 25.5,
     "hospitalIds": [
-      366,
       237,
-      253
+      366
     ]
   },
   {
@@ -11314,8 +11242,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 7.5,
     "hospitalIds": [
       253,
-      367,
-      237
+      367
     ]
   },
   {
@@ -11486,9 +11413,9 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "47.960 hab",
     "areaKm2": 14.5,
     "hospitalIds": [
-      368,
       293,
-      306
+      306,
+      368
     ]
   },
   {
@@ -11851,9 +11778,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "47.997 hab",
     "areaKm2": 21.5,
     "hospitalIds": [
-      369,
       301,
-      368
+      369
     ]
   },
   {
@@ -12060,9 +11986,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "48.034 hab",
     "areaKm2": 28.5,
     "hospitalIds": [
-      308,
-      370,
-      290
+      290,
+      370
     ]
   },
   {
@@ -12201,9 +12126,10 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "48.071 hab",
     "areaKm2": 10.5,
     "hospitalIds": [
-      298,
       297,
-      299
+      298,
+      299,
+      371
     ]
   },
   {
@@ -12348,7 +12274,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "hospitalIds": [
       304,
       308,
-      370
+      372
     ]
   },
   {
@@ -12451,7 +12377,6 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "48.145 hab",
     "areaKm2": 24.5,
     "hospitalIds": [
-      335,
       241,
       373
     ]
@@ -12556,9 +12481,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "48.182 hab",
     "areaKm2": 6.5,
     "hospitalIds": [
-      374,
       334,
-      239
+      374
     ]
   },
   {
@@ -12665,9 +12589,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "48.219 hab",
     "areaKm2": 13.5,
     "hospitalIds": [
-      375,
       335,
-      364
+      375
     ]
   },
   {
@@ -12968,7 +12891,6 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 27.5,
     "hospitalIds": [
       336,
-      378,
       377
     ]
   },
@@ -13093,8 +13015,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 9.5,
     "hospitalIds": [
       266,
-      378,
-      379
+      283,
+      378
     ]
   },
   {
@@ -13313,9 +13235,8 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "48.367 hab",
     "areaKm2": 16.5,
     "hospitalIds": [
-      267,
-      284,
-      337
+      337,
+      379
     ]
   },
   {
@@ -13451,8 +13372,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "areaKm2": 23.5,
     "hospitalIds": [
       338,
-      380,
-      288
+      380
     ]
   },
   {
@@ -13587,9 +13507,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "48.441 hab",
     "areaKm2": 5.5,
     "hospitalIds": [
-      288,
-      273,
-      338
+      288
     ]
   },
   {
@@ -13747,11 +13665,7 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "air": 3.3,
     "population": "48.478 hab",
     "areaKm2": 12.5,
-    "hospitalIds": [
-      289,
-      265,
-      277
-    ]
+    "hospitalIds": []
   },
   {
     "id": 96,
@@ -13885,9 +13799,9 @@ export const ALL_SP_DISTRICTS: SPDistrictRegion[] = [
     "population": "48.515 hab",
     "areaKm2": 19.5,
     "hospitalIds": [
+      261,
       269,
-      280,
-      277
+      280
     ]
   }
 ];
