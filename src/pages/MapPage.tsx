@@ -156,22 +156,25 @@ export default function MapPage() {
     }
   }, [location.search, userRegisteredDistrictName]);
 
-  const basemapUrls: Record<string, { url: string; attribution: string }> = {
+  const basemapUrls: Record<string, { url: string; subdomains?: string; attribution: string }> = {
     dark: {
-      url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png',
-      attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      subdomains: 'abcd',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
     },
     satellite: {
       url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP'
     },
     street: {
-      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      subdomains: 'abc',
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     },
     voyager: {
-      url: 'https://tiles.stadiamaps.com/tiles/outdoors/{z}/{x}/{y}{r}.png',
-      attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      subdomains: 'abcd',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
     }
   };
 
@@ -1015,6 +1018,8 @@ export default function MapPage() {
             <TileLayer
               key={basemap}
               url={basemapUrls[basemap].url}
+              subdomains={basemapUrls[basemap].subdomains || 'abc'}
+              maxZoom={20}
               attribution={basemapUrls[basemap].attribution}
             />
             <MapController 
