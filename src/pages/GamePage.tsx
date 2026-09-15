@@ -204,7 +204,7 @@ function getRandomQuestions(count: number = 5): Question[] {
 }
 
 export default function GamePage() {
-  const [mode, setMode] = useState<'quiz' | 'results'>('quiz');
+  const [mode, setMode] = useState<'welcome' | 'quiz' | 'results'>('welcome');
   const [questions, setQuestions] = useState<Question[]>(() => getRandomQuestions(5));
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -242,6 +242,17 @@ export default function GamePage() {
     return () => clearInterval(interval);
   }, [mode]);
 
+  const handleStartQuiz = () => {
+    setQuestions(getRandomQuestions(5));
+    setCurrentIdx(0);
+    setSelectedOption(null);
+    setAnswers([]);
+    setTimer(0);
+    setScore(0);
+    setEmailSuccessMsg('');
+    setMode('quiz');
+  };
+
   const handleConfirmAnswer = () => {
     if (!selectedOption) return;
 
@@ -270,9 +281,7 @@ export default function GamePage() {
   };
 
   const handleReset = () => {
-    // Generate fresh new random non-repeating questions on reset
-    setQuestions(getRandomQuestions(5));
-    setMode('quiz');
+    setMode('welcome');
     setCurrentIdx(0);
     setSelectedOption(null);
     setAnswers([]);
@@ -334,6 +343,161 @@ export default function GamePage() {
       setIsSendingEmail(false);
     }
   };
+
+  // 1. Render Welcome / Reception Screen
+  if (mode === 'welcome') {
+    return (
+      <div style={{ maxWidth: '840px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        {/* Welcome Hero Card */}
+        <div className="hud-card" style={{
+          padding: '36px',
+          backgroundColor: '#070B14',
+          border: '2px solid rgba(59, 130, 246, 0.4)',
+          borderRadius: '20px',
+          boxShadow: '0 0 30px rgba(37, 99, 235, 0.18)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '24px'
+        }}>
+          {/* Top Banner */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '16px',
+              backgroundColor: 'rgba(37, 99, 235, 0.2)',
+              border: '1.5px solid #3B82F6',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '32px',
+              boxShadow: '0 0 20px rgba(59, 130, 246, 0.3)'
+            }}>
+              🎮
+            </div>
+            <div>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
+                padding: '3px 10px',
+                borderRadius: '12px',
+                color: '#60A5FA',
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                marginBottom: '6px'
+              }}>
+                <span>🎓 Capacitação Oficial SUS & Vigilância SP</span>
+              </div>
+              <h1 style={{ color: '#FFFFFF', fontSize: '2rem', margin: 0, fontWeight: 900, letterSpacing: '-0.5px' }}>
+                Missão do Agente de Saúde
+              </h1>
+              <p style={{ color: '#94A3B8', fontSize: '0.95rem', margin: '4px 0 0' }}>
+                Ambiente interativo de simulação de tomada de decisão clínica, primeiros socorros e controle epidemiológico.
+              </p>
+            </div>
+          </div>
+
+          {/* User Info Capsule */}
+          <div style={{
+            backgroundColor: '#0F172A',
+            border: '1px solid #1E293B',
+            borderRadius: '14px',
+            padding: '16px 20px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '24px' }}>👤</span>
+              <div>
+                <span style={{ fontSize: '0.72rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 800, display: 'block' }}>
+                  Profissional / Participante
+                </span>
+                <strong style={{ fontSize: '1.05rem', color: '#FFFFFF' }}>{user.name}</strong>
+                <span style={{ fontSize: '0.8rem', color: '#60A5FA', display: 'block' }}>{user.role} • {user.district}</span>
+              </div>
+            </div>
+
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.75rem',
+              color: '#34D399',
+              backgroundColor: 'rgba(16, 185, 129, 0.12)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              fontWeight: 800
+            }}>
+              <span>● Conexão Segura Ativa</span>
+            </div>
+          </div>
+
+          {/* Rules & Highlights 3-Card Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+            <div style={{ backgroundColor: '#0F172A', border: '1px solid #1E293B', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '22px' }}>📋</span>
+              <strong style={{ fontSize: '0.95rem', color: '#F1F5F9', fontWeight: 800 }}>5 Questões Dinâmicas</strong>
+              <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: 0, lineHeight: 1.4 }}>
+                Sorteio automatizado e sem repetição a partir do banco de vigilância e protocolos SUS da capital.
+              </p>
+            </div>
+
+            <div style={{ backgroundColor: '#0F172A', border: '1px solid #1E293B', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '22px' }}>⏱️</span>
+              <strong style={{ fontSize: '0.95rem', color: '#F1F5F9', fontWeight: 800 }}>Cronometragem Ativa</strong>
+              <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: 0, lineHeight: 1.4 }}>
+                O tempo é computado em tempo real para avaliar agilidade na resposta e triagem.
+              </p>
+            </div>
+
+            <div style={{ backgroundColor: '#0F172A', border: '1px solid #1E293B', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '22px' }}>📜</span>
+              <strong style={{ fontSize: '0.95rem', color: '#F1F5F9', fontWeight: 800 }}>Relatório & Certificado</strong>
+              <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: 0, lineHeight: 1.4 }}>
+                Ao concluir, visualize seu aproveitamento com relatório detalhado de acertos e envio por e-mail ou PDF.
+              </p>
+            </div>
+          </div>
+
+          {/* CTA Start Button */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center', marginTop: '8px' }}>
+            <button
+              type="button"
+              onClick={handleStartQuiz}
+              className="btn-primary"
+              style={{
+                width: '100%',
+                maxWidth: '380px',
+                padding: '16px 28px',
+                fontSize: '1.1rem',
+                fontWeight: 900,
+                borderRadius: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                boxShadow: '0 0 25px rgba(37, 99, 235, 0.4)',
+                cursor: 'pointer'
+              }}
+            >
+              <span>🚀</span>
+              <span>Iniciar Missão Agora</span>
+            </button>
+            <span style={{ fontSize: '0.75rem', color: '#64748B' }}>
+              Você pode pausar ou reiniciar a missão a qualquer momento.
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Render Completion Screen with Printable Certificate & Report
   if (mode === 'results') {
