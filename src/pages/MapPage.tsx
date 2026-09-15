@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import L from 'leaflet';
-import { MapContainer, TileLayer, Polygon, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, Marker, Popup, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { api } from '../api/client';
 
@@ -59,11 +59,13 @@ const createDarkHospitalMarkerIcon = (hospital: Hospital, isSelected: boolean, i
 const MapController = ({ 
   center, 
   zoom, 
-  zoomTrigger 
+  zoomTrigger,
+  onMapChange
 }: { 
   center: [number, number]; 
   zoom: number; 
-  zoomTrigger?: { type: 'in' | 'out' | 'recenter'; timestamp: number } | null 
+  zoomTrigger?: { type: 'in' | 'out' | 'recenter'; timestamp: number } | null;
+  onMapChange?: (zoom: number, bounds: L.LatLngBounds) => void;
 }) => {
   const map = useMap();
 
@@ -77,6 +79,15 @@ const MapController = ({
     if (zoomTrigger.type === 'out') map.zoomOut();
     if (zoomTrigger.type === 'recenter') map.flyTo([-23.5505, -46.6333], 11, { duration: 1.0 });
   }, [zoomTrigger, map]);
+
+  useMapEvents({
+    zoomend: (e) => {
+      onMapChange?.(e.target.getZoom(), e.target.getBounds());
+    },
+    moveend: (e) => {
+      onMapChange?.(e.target.getZoom(), e.target.getBounds());
+    }
+  });
 
   return null;
 };
@@ -108,11 +119,13 @@ export default function MapPage() {
   const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>([-23.5505, -46.6333]);
   const [mapZoom, setMapZoom] = useState<number>(11);
+  const [currentZoom, setCurrentZoom] = useState<number>(11);
+  const [currentBounds, setCurrentBounds] = useState<L.LatLngBounds | null>(null);
   const [filterZone, setFilterZone] = useState<string>('Todas');
   const [filterRisk, setFilterRisk] = useState<string>('Todos');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [hospitalFilter, setHospitalFilter] = useState<string>('Todos');
-  const [pinMode, setPinMode] = useState<'region' | 'all' | 'none'>('all');
+  const [pinMode, setPinMode] = useState<'auto' | 'region' | 'all' | 'none'>('auto');
   const [basemap, setBasemap] = useState<'dark' | 'satellite' | 'street' | 'voyager'>('dark');
   const [mapLayerMode, setMapLayerMode] = useState<'all' | 'risk' | 'hospitals'>('all');
   const [polygonOpacity, setPolygonOpacity] = useState<number>(0.38);
@@ -145,8 +158,8 @@ export default function MapPage() {
 
   const basemapUrls: Record<string, { url: string; attribution: string }> = {
     dark: {
-      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-      attribution: '&copy; Esri &mdash; Esri, DeLorme, NAVTEQ, OpenStreetMap'
+      url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png',
+      attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     },
     satellite: {
       url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -157,8 +170,8 @@ export default function MapPage() {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     },
     voyager: {
-      url: 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-      attribution: '&copy; CARTO &copy; OpenStreetMap'
+      url: 'https://tiles.stadiamaps.com/tiles/outdoors/{z}/{x}/{y}{r}.png',
+      attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }
   };
 
@@ -216,22 +229,53 @@ export default function MapPage() {
     });
   }, [hudScope, selectedDistrict, filterZone, hospitalFilter]);
 
-  // Map Pins: Smart filtering based on pinMode and filterZone
+  // Map Pins: Smart filtering based on zoom level and area (reduces visual pollution)
   const mapVisibleHospitals = useMemo(() => {
     if (pinMode === 'none') return [];
 
-    let base = ALL_SP_HOSPITALS;
+    let base: Hospital[] = [];
 
-    if (pinMode === 'region') {
-      if (filterZone !== 'Todas') {
+    if (pinMode === 'auto') {
+      // Zoom inteligente:
+      // Se zoom for menor que 13 (visão macro de toda SP):
+      // Não polui o mapa com dezenas de ícones sobrepostos!
+      // Mostra apenas o hospital que foi clicado ou os hospitais do bairro selecionado
+      if (currentZoom < 13) {
+        if (selectedHospital) {
+          base = [selectedHospital];
+        } else if (hudScope === 'district' && selectedDistrict?.hospitalIds) {
+          base = ALL_SP_HOSPITALS.filter(h => selectedDistrict.hospitalIds.includes(h.id));
+        } else if (filterZone !== 'Todas') {
+          base = ALL_SP_HOSPITALS.filter(h => (h?.zone || '').trim().toLowerCase() === filterZone.trim().toLowerCase());
+        } else {
+          // Visão panorâmica de SP geral: limpa o mapa para visualização dos polígonos de risco
+          base = [];
+        }
+      } else {
+        // Zoom >= 13 (área aproximada do bairro/zona): mostra os hospitais presentes na área visível
+        if (currentBounds) {
+          base = ALL_SP_HOSPITALS.filter(h => currentBounds.contains([h.latitude, h.longitude]));
+        } else if (filterZone !== 'Todas') {
+          base = ALL_SP_HOSPITALS.filter(h => (h?.zone || '').trim().toLowerCase() === filterZone.trim().toLowerCase());
+        } else if (selectedDistrict?.hospitalIds) {
+          base = ALL_SP_HOSPITALS.filter(h => selectedDistrict.hospitalIds.includes(h.id));
+        } else {
+          base = ALL_SP_HOSPITALS;
+        }
+      }
+    } else if (pinMode === 'region') {
+      if (hudScope === 'district' && selectedDistrict?.hospitalIds) {
+        base = ALL_SP_HOSPITALS.filter(h => selectedDistrict.hospitalIds.includes(h.id));
+      } else if (filterZone !== 'Todas') {
         base = ALL_SP_HOSPITALS.filter(h => (h?.zone || '').trim().toLowerCase() === filterZone.trim().toLowerCase());
       } else {
-        // In SP Overview with region mode, show key reference hospitals to prevent dense clutter
         base = ALL_SP_HOSPITALS.filter(h => [101, 102, 201, 204, 301, 306, 401, 405, 501, 510].includes(h.id));
       }
     } else if (pinMode === 'all') {
-      if (filterZone !== 'Todas') {
-        base = ALL_SP_HOSPITALS.filter(h => (h?.zone || '').trim().toLowerCase() === filterZone.trim().toLowerCase());
+      if (currentBounds && currentZoom >= 13) {
+        base = ALL_SP_HOSPITALS.filter(h => currentBounds.contains([h.latitude, h.longitude]));
+      } else {
+        base = ALL_SP_HOSPITALS;
       }
     }
 
@@ -243,7 +287,7 @@ export default function MapPage() {
       if (hospitalFilter === 'Filantrópico') return h?.network === 'Filantrópico';
       return true;
     });
-  }, [pinMode, filterZone, hospitalFilter]);
+  }, [pinMode, currentZoom, currentBounds, selectedHospital, hudScope, selectedDistrict, filterZone, hospitalFilter]);
 
   const handleSelectDistrict = (d: SPDistrictRegion) => {
     setSelectedDistrict(d);
@@ -878,9 +922,10 @@ export default function MapPage() {
               <div className="gis-settings-section-title">🏥 Pins de Hospitais</div>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {[
-                  { id: 'all', label: 'Todos (68)' },
-                  { id: 'region', label: 'Por Região' },
-                  { id: 'none', label: 'Ocultar' }
+                  { id: 'auto', label: '⚡ Zoom Inteligente' },
+                  { id: 'region', label: '📍 Por Região' },
+                  { id: 'all', label: '🌐 Todos' },
+                  { id: 'none', label: '🚫 Ocultar' }
                 ].map(p => (
                   <button key={p.id} type="button"
                     className={`gis-map-btn ${pinMode === p.id ? 'active' : ''}`}
@@ -979,6 +1024,10 @@ export default function MapPage() {
               center={mapCenter} 
               zoom={mapZoom} 
               zoomTrigger={zoomTrigger} 
+              onMapChange={(z, b) => {
+                setCurrentZoom(z);
+                setCurrentBounds(b);
+              }}
             />
 
             {/* Clean Modern Risk Polygons with Configurable Opacity & Labels */}

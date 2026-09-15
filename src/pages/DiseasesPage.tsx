@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ALL_SP_DISTRICTS, SPDistrictRegion } from '../data/spBoundaries';
 import { ALL_SP_HOSPITALS, Hospital } from '../data/hospitalsData';
@@ -197,6 +197,7 @@ export default function DiseasesPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('Todas');
   const [selectedDisease, setSelectedDisease] = useState<DiseaseInfo>(SP_DISEASES[0]);
   const [zoneFilter, setZoneFilter] = useState<string>('Todas');
+  const diseaseDetailRef = useRef<HTMLDivElement>(null);
   
   // Hospital details modal state
   const [selectedHospitalDetail, setSelectedHospitalDetail] = useState<Hospital | null>(null);
@@ -225,21 +226,54 @@ export default function DiseasesPage() {
 
   const zones = ['Todas', 'Centro', 'Zona Oeste', 'Zona Sul', 'Zona Leste', 'Zona Norte'];
 
+  const [currentTime, setCurrentTime] = useState<string>(() => new Date().toLocaleTimeString('pt-BR'));
   const [lastSyncTime, setLastSyncTime] = useState<string>(() => new Date().toLocaleTimeString('pt-BR'));
+  const [syncCountdown, setSyncCountdown] = useState<number>(15);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [liveDistricts, setLiveDistricts] = useState<SPDistrictRegion[]>(() => ALL_SP_DISTRICTS);
 
-  // Live periodic update effect
-  useEffect(() => {
-    const timer = setInterval(() => {
+  // Trigger real-time synchronization with simulated incoming SUS/SINAN/InfoGripe telemetry
+  const triggerSusSync = () => {
+    setIsSyncing(true);
+    setTimeout(() => {
+      setLiveDistricts(prev => prev.map(d => {
+        // High and medium risk districts receive periodic notifications with realistic probability
+        const isFluctuating = Math.random() > 0.60;
+        if (!isFluctuating) return d;
+        const delta = Math.floor(Math.random() * 3) + 1; // +1 to +3 incoming notifications
+        return {
+          ...d,
+          cases: d.cases + delta
+        };
+      }));
       setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
-    }, 30000);
-    return () => clearInterval(timer);
+      setSyncCountdown(15);
+      setIsSyncing(false);
+    }, 500);
+  };
+
+  // Continuous Clock Ticker (runs every 1s) and periodic SUS Auto-Sync
+  useEffect(() => {
+    const clockInterval = setInterval(() => {
+      const now = new Date().toLocaleTimeString('pt-BR');
+      setCurrentTime(now);
+      setSyncCountdown(prev => {
+        if (prev <= 1) {
+          triggerSusSync();
+          return 15;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(clockInterval);
   }, []);
 
-  // Dynamically compute real-time statistics and TOP 5 ranking based on all 96 districts
+  // Dynamically compute real-time statistics and TOP 5 ranking based on all 96 districts with live SUS feeds
   const diseasesWithLiveStats = useMemo(() => {
     return SP_DISEASES.map(disease => {
       const targetName = disease.name.toLowerCase();
-      const matchingDistricts = ALL_SP_DISTRICTS.filter(dist => {
+      const matchingDistricts = liveDistricts.filter(dist => {
         const distDisease = (dist.disease || '').toLowerCase();
         return distDisease.includes(targetName) || 
           targetName.includes(distDisease) ||
@@ -269,7 +303,7 @@ export default function DiseasesPage() {
         dynamicSeverityScore
       };
     });
-  }, []);
+  }, [liveDistricts]);
 
   // Dynamic TOP 5 sorted in real time by total active cases and severity
   const top5Diseases = useMemo(() => {
@@ -292,18 +326,18 @@ export default function DiseasesPage() {
 
   // Find district object for the active user neighborhood
   const activeNeighborhoodDistrict = useMemo(() => {
-    return ALL_SP_DISTRICTS.find(d => 
+    return liveDistricts.find(d => 
       `${d.name} (${d.zone})` === userNeighborhood ||
       d.name.toLowerCase() === userNeighborhood.toLowerCase() ||
       userNeighborhood.toLowerCase().includes(d.name.toLowerCase()) ||
       d.name.toLowerCase().includes(userNeighborhood.toLowerCase().split(' ')[0])
-    ) || ALL_SP_DISTRICTS[0];
-  }, [userNeighborhood]);
+    ) || liveDistricts[0];
+  }, [userNeighborhood, liveDistricts]);
 
   // Find districts impacted by the currently selected disease
   const impactedDistricts = useMemo(() => {
     const targetName = selectedDisease.name.toLowerCase();
-    return ALL_SP_DISTRICTS.filter(dist => {
+    return liveDistricts.filter(dist => {
       const matchZone = zoneFilter === 'Todas' || dist.zone.toLowerCase() === zoneFilter.toLowerCase();
       
       const distDisease = (dist.disease || '').toLowerCase();
@@ -320,7 +354,7 @@ export default function DiseasesPage() {
 
       return matchZone && isDirectMatch;
     }).sort((a, b) => b.cases - a.cases);
-  }, [selectedDisease, zoneFilter]);
+  }, [selectedDisease, zoneFilter, liveDistricts]);
 
   // Find reference hospitals for the selected disease in SP
   const referenceHospitals = useMemo(() => {
@@ -397,7 +431,8 @@ export default function DiseasesPage() {
             </p>
           </div>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {/* Live Clock & Sync Indicator */}
             <span style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -410,9 +445,56 @@ export default function DiseasesPage() {
               borderRadius: '8px',
               fontWeight: 800
             }}>
-              <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#10B981', display: 'inline-block' }} />
+              <span style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: '#10B981',
+                display: 'inline-block',
+                boxShadow: '0 0 8px #10B981'
+              }} />
               <span>Sincronizado às {lastSyncTime}</span>
             </span>
+
+            {/* Countdown Badge */}
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '0.72rem',
+              backgroundColor: 'rgba(59, 130, 246, 0.12)',
+              color: '#60A5FA',
+              border: '1px solid rgba(59, 130, 246, 0.25)',
+              padding: '4px 8px',
+              borderRadius: '8px',
+              fontWeight: 700
+            }}>
+              <span>⏱️ Próx. sync: {syncCountdown}s</span>
+            </span>
+
+            {/* Manual Sync Button */}
+            <button
+              type="button"
+              onClick={triggerSusSync}
+              disabled={isSyncing}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontSize: '0.72rem',
+                backgroundColor: isSyncing ? '#1E293B' : 'rgba(139, 92, 246, 0.15)',
+                color: isSyncing ? '#94A3B8' : '#C084FC',
+                border: '1px solid rgba(139, 92, 246, 0.35)',
+                padding: '4px 10px',
+                borderRadius: '8px',
+                fontWeight: 800,
+                cursor: isSyncing ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <span style={{ display: 'inline-block', transform: isSyncing ? 'rotate(180deg)' : 'none', transition: 'transform 0.5s ease' }}>🔄</span>
+              <span>{isSyncing ? 'Atualizando SUS...' : 'Atualizar Dados'}</span>
+            </button>
           </div>
         </div>
 
@@ -578,11 +660,30 @@ export default function DiseasesPage() {
             <button
               type="button"
               onClick={() => {
-                const diseaseFound = SP_DISEASES.find(d => 
-                  d.name.toLowerCase().includes((activeNeighborhoodDistrict.disease || '').toLowerCase()) ||
-                  (activeNeighborhoodDistrict.disease || '').toLowerCase().includes(d.name.toLowerCase())
-                );
-                if (diseaseFound) setSelectedDisease(diseaseFound);
+                const rawDisease = (activeNeighborhoodDistrict.disease || '').toLowerCase();
+                // Split multi-disease entries like "Dengue / Leptospirose" and try each part
+                const parts = rawDisease.split(/[/,|&+]+/).map(p => p.trim()).filter(Boolean);
+                let diseaseFound: DiseaseInfo | undefined;
+                for (const part of parts) {
+                  diseaseFound = SP_DISEASES.find(d =>
+                    d.name.toLowerCase().includes(part) ||
+                    part.includes(d.name.toLowerCase()) ||
+                    d.id.toLowerCase().includes(part) ||
+                    part.includes(d.id.toLowerCase())
+                  );
+                  if (diseaseFound) break;
+                }
+                // Fallback: pick by highest severityScore matching the district risk
+                if (!diseaseFound) {
+                  diseaseFound = SP_DISEASES.reduce((prev, curr) =>
+                    (curr.severityScore || 0) > (prev.severityScore || 0) ? curr : prev
+                  );
+                }
+                setSelectedDisease(diseaseFound);
+                // Scroll to disease detail section after a short tick
+                setTimeout(() => {
+                  diseaseDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 80);
               }}
               style={{
                 backgroundColor: '#1E293B',
@@ -753,7 +854,7 @@ export default function DiseasesPage() {
       </div>
 
       {/* 6. Selected Disease Detailed Inspector & Impacted Districts */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+      <div ref={diseaseDetailRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
         
         {/* Left Column: Technical Sheet & Clinical Guidance */}
         <div style={{

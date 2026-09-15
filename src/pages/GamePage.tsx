@@ -11,8 +11,201 @@ interface Question {
   options: Array<{ id: string; text: string }>;
 }
 
+const QUESTION_BANK: Omit<Question, 'id'>[] = [
+  {
+    text: "Qual a melhor forma de evitar a proliferação do mosquito Aedes aegypti transmissor da Dengue?",
+    category: "Controle de Vetores",
+    correctOption: "B",
+    explanation: "A eliminação de criadouros com água estagnada é a medida mais eficaz para interromper o ciclo reprodutivo do Aedes aegypti.",
+    options: [
+      { id: "A", text: "Usar máscara cirúrgica em locais públicos" },
+      { id: "B", text: "Eliminar recipientes com água parada em vasos, calhas e garrafas" },
+      { id: "C", text: "Aumentar o consumo de frutas cítricas" },
+      { id: "D", text: "Dormir com as janelas abertas" }
+    ]
+  },
+  {
+    text: "O que significa a sigla UBS no sistema público de saúde de São Paulo?",
+    category: "Atenção Primária SUS",
+    correctOption: "A",
+    explanation: "UBS significa Unidade Básica de Saúde, a porta de entrada preferencial do Sistema Único de Saúde (SUS).",
+    options: [
+      { id: "A", text: "Unidade Básica de Saúde" },
+      { id: "B", text: "União Brasileira de Socorro" },
+      { id: "C", text: "Urgência Básica Sanitária" },
+      { id: "D", text: "Unidade de Busca Sanitária" }
+    ]
+  },
+  {
+    text: "Para situações de infarto, acidentes graves e risco iminente de vida, onde procurar atendimento imediato?",
+    category: "Urgência & Emergência",
+    correctOption: "C",
+    explanation: "Pronto-Socorros Hospitalares e UPAs 24h dispõem de salas vermelhas com suporte avançado de vida e UTI.",
+    options: [
+      { id: "A", text: "Farmácia Comunitária" },
+      { id: "B", text: "Unidade Básica de Saúde (UBS)" },
+      { id: "C", text: "Pronto-Socorro Hospitalar / UPA 24h" },
+      { id: "D", text: "Laboratório de Análises" }
+    ]
+  },
+  {
+    text: "Qual doença bacteriana grave está associada ao contato com águas de enchentes contaminadas por urina de roedores?",
+    category: "Vigilância Ambiental",
+    correctOption: "B",
+    explanation: "A Leptospirose é causada pela bactéria Leptospira, eliminada na urina de ratos e presente em alagamentos.",
+    options: [
+      { id: "A", text: "Dengue" },
+      { id: "B", text: "Leptospirose" },
+      { id: "C", text: "Catapora" },
+      { id: "D", text: "Sarampo" }
+    ]
+  },
+  {
+    text: "Qual a principal medida preventiva contra surtos de Influenza (Gripe) na capital paulista?",
+    category: "Imunização & Prevenção",
+    correctOption: "A",
+    explanation: "A vacinação anual atualizada confere imunidade contra as cepas circulantes mais virulentas de influenza.",
+    options: [
+      { id: "A", text: "Vacinação anual nas Unidades Básicas de Saúde (UBS)" },
+      { id: "B", text: "Exposição ao sol ao meio-dia" },
+      { id: "C", text: "Uso de óculos escuros" },
+      { id: "D", text: "Uso de calçados impermeáveis" }
+    ]
+  },
+  {
+    text: "Qual é o número de telefone de emergência gratuito do SAMU para atendimento pré-hospitalar móvel?",
+    category: "Urgência & Emergência",
+    correctOption: "A",
+    explanation: "O SAMU atende pelo telefone 192, prestando socorro móvel de urgência 24 horas por dia.",
+    options: [
+      { id: "A", text: "192" },
+      { id: "B", text: "190" },
+      { id: "C", text: "193" },
+      { id: "D", text: "156" }
+    ]
+  },
+  {
+    text: "Qual o sintoma clássico que diferencia a suspeita de Leptospirose de outras infecções febris?",
+    category: "Sinais & Sintomas",
+    correctOption: "C",
+    explanation: "Dor intensa nas panturrilhas (mialgia em panturrilhas) associada a febre e histórico de alagamento é o sinal clássico de leptospirose.",
+    options: [
+      { id: "A", text: "Perda de dentes" },
+      { id: "B", text: "Dor exclusiva nos cotovelos" },
+      { id: "C", text: "Forte dor nas panturrilhas (panturrilha hiperestésica)" },
+      { id: "D", text: "Visão dupla súbita" }
+    ]
+  },
+  {
+    text: "Em caso de tosse persistente por mais de 3 semanas, qual patologia de notificação compulsória deve ser investigada?",
+    category: "Vigilância Epidemiológica",
+    correctOption: "B",
+    explanation: "Tosse por 3 semanas ou mais é o critério para Sintomático Respiratório de Tuberculose, que exige baciloscopia ou teste rápido molecular.",
+    options: [
+      { id: "A", text: "Rinite alérgica simples" },
+      { id: "B", text: "Tuberculose Pulmonar" },
+      { id: "C", text: "Sinusite aguda" },
+      { id: "D", text: "Gastrite" }
+    ]
+  },
+  {
+    text: "O que significa a sigla AMA na rede municipal de saúde de São Paulo?",
+    category: "Atenção Primária SUS",
+    correctOption: "A",
+    explanation: "AMA significa Assistência Médica Ambulatorial, voltada a atendimentos de baixa e média complexidade sem necessidade de internação.",
+    options: [
+      { id: "A", text: "Assistência Médica Ambulatorial" },
+      { id: "B", text: "Ambulatório Municipal Avançado" },
+      { id: "C", text: "Atendimento Médico de Apoio" },
+      { id: "D", text: "Área Municipal de Acolhimento" }
+    ]
+  },
+  {
+    text: "Qual a melhor recomendação para desinfecção doméstica de reservatórios e caixas d'água?",
+    category: "Vigilância Sanitária",
+    correctOption: "D",
+    explanation: "Utilizar solução com hipoclorito de sódio / água sanitária na dosagem correta, esfregar com escova sem sabão e manter a caixa bem vedada.",
+    options: [
+      { id: "A", text: "Lavar com detergente perfumado e deixar aberta" },
+      { id: "B", text: "Aplicar óleo mineral nas bordas internas" },
+      { id: "C", text: "Pintar o interior com tinta acrílica" },
+      { id: "D", text: "Higienizar com solução de água sanitária e vedar completamente a tampa" }
+    ]
+  },
+  {
+    text: "No Protocolo de Triagem de Manchester, qual cor indica necessidade de atendimento emergencial imediato (risco iminente de morte)?",
+    category: "Protocolos Clínicos",
+    correctOption: "A",
+    explanation: "A cor Vermelha representa emergência absoluta (tempo de espera 0 minutos), com encaminhamento direto para a Sala Vermelha.",
+    options: [
+      { id: "A", text: "Vermelho" },
+      { id: "B", text: "Amarelo" },
+      { id: "C", text: "Verde" },
+      { id: "D", text: "Azul" }
+    ]
+  },
+  {
+    text: "Qual medida é recomendada para moradores ou visitantes de áreas florestais e parques da Zona Norte/Sul de SP contra Febre Amarela?",
+    category: "Imunização & Vetores",
+    correctOption: "C",
+    explanation: "A vacina contra Febre Amarela (dose única no SUS) é a proteção mais segura e eficaz contra o vírus transmitido por mosquitos silvestres.",
+    options: [
+      { id: "A", text: "Evitar beber água da torneira" },
+      { id: "B", text: "Tomar antibiótico antes do passeio" },
+      { id: "C", text: "Tomar a vacina da Febre Amarela pelo menos 10 dias antes" },
+      { id: "D", text: "Uso de luvas de borracha durante o dia" }
+    ]
+  },
+  {
+    text: "Em caso de picada de escorpião ou animal peçonhento em São Paulo, qual a conduta adequada enquanto busca socorro médico?",
+    category: "Primeiros Socorros",
+    correctOption: "B",
+    explanation: "Lavar o local apenas com água e sabão e buscar imediatamente atendimento médico no Hospital de referência (ex: Instituto Butantan / Vital Brazil). Não fazer torniquete nem cortar.",
+    options: [
+      { id: "A", text: "Fazer um torniquete bem apertado no membro afetado" },
+      { id: "B", text: "Lavar o local com água e sabão e procurar hospital de referência imediatamente" },
+      { id: "C", text: "Fazer cortes na pele para sugar o veneno" },
+      { id: "D", text: "Aplicar borra de café ou folhas no ferimento" }
+    ]
+  },
+  {
+    text: "Qual a via de transmissão predominante da Hepatite A em áreas com deficiência de saneamento?",
+    category: "Saúde Ambiental",
+    correctOption: "A",
+    explanation: "A Hepatite A é transmitida principalmente pela via fecal-oral, através de água e alimentos contaminados ou higiene inadequada das mãos.",
+    options: [
+      { id: "A", text: "Fecal-oral (água ou alimentos contaminados)" },
+      { id: "B", text: "Picada de mosquito transmissor" },
+      { id: "C", text: "Gotículas suspensas no ar" },
+      { id: "D", text: "Contato com pelos de animais domésticos" }
+    ]
+  },
+  {
+    text: "Qual a importância da Terapia de Reidratação Oral (Soro Caseiro / Sais de Reidratação) em episódios de diarreia infantil?",
+    category: "Atenção Primária SUS",
+    correctOption: "D",
+    explanation: "Previne a desidratação grave e o choque hipovolêmico, sendo a intervenção mais rápida e salvadora em quadros de gastroenterite.",
+    options: [
+      { id: "A", text: "Substituir a vacinação obrigatória" },
+      { id: "B", text: "Aumentar a temperatura corporal" },
+      { id: "C", text: "Eliminar a necessidade de alimentação" },
+      { id: "D", text: "Prevenir e tratar precocemente a desidratação mantendo o equilíbrio hidroeletrolítico" }
+    ]
+  }
+];
+
+// Helper to get random non-repeating questions
+function getRandomQuestions(count: number = 5): Question[] {
+  const shuffled = [...QUESTION_BANK].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count).map((q, idx) => ({
+    ...q,
+    id: idx + 1
+  }));
+}
+
 export default function GamePage() {
   const [mode, setMode] = useState<'quiz' | 'results'>('quiz');
+  const [questions, setQuestions] = useState<Question[]>(() => getRandomQuestions(5));
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Array<{ question_id: number; selected_option: string; is_correct: boolean }>>([]);
@@ -49,74 +242,6 @@ export default function GamePage() {
     return () => clearInterval(interval);
   }, [mode]);
 
-  const questions: Question[] = [
-    {
-      id: 1,
-      text: "Qual a melhor forma de evitar a proliferação do mosquito Aedes aegypti transmissor da Dengue?",
-      category: "Controle de Vetores",
-      correctOption: "B",
-      explanation: "A eliminação de criadouros com água estagnada é a medida mais eficaz para interromper o ciclo reprodutivo do Aedes aegypti.",
-      options: [
-        { id: "A", text: "Usar máscara cirúrgica em locais públicos" },
-        { id: "B", text: "Eliminar recipientes com água parada em vasos, calhas e garrafas" },
-        { id: "C", text: "Aumentar o consumo de frutas cítricas" },
-        { id: "D", text: "Dormir com as janelas abertas" }
-      ]
-    },
-    {
-      id: 2,
-      text: "O que significa a sigla UBS no sistema público de saúde de São Paulo?",
-      category: "Atenção Primária SUS",
-      correctOption: "A",
-      explanation: "UBS significa Unidade Básica de Saúde, a porta de entrada preferencial do Sistema Único de Saúde (SUS).",
-      options: [
-        { id: "A", text: "Unidade Básica de Saúde" },
-        { id: "B", text: "União Brasileira de Socorro" },
-        { id: "C", text: "Urgência Básica Sanitária" },
-        { id: "D", text: "Unidade de Busca Sanitária" }
-      ]
-    },
-    {
-      id: 3,
-      text: "Para situações de infarto, acidentes graves e risco iminente de vida, onde procurar atendimento imediato?",
-      category: "Urgência & Emergência",
-      correctOption: "C",
-      explanation: "Pronto-Socorros Hospitalares e UPAs 24h dispõem de salas vermelhas com suporte avançado de vida e UTI.",
-      options: [
-        { id: "A", text: "Farmácia Comunitária" },
-        { id: "B", text: "Unidade Básica de Saúde (UBS)" },
-        { id: "C", text: "Pronto-Socorro Hospitalar / UPA 24h" },
-        { id: "D", text: "Laboratório de Análises" }
-      ]
-    },
-    {
-      id: 4,
-      text: "Qual doença bacteriana grave está associada ao contato com águas de enchentes contaminadas por urina de roedores?",
-      category: "Vigilância Ambiental",
-      correctOption: "B",
-      explanation: "A Leptospirose é causada pela bactéria Leptospira, eliminada na urina de ratos e presente em alagamentos.",
-      options: [
-        { id: "A", text: "Dengue" },
-        { id: "B", text: "Leptospirose" },
-        { id: "C", text: "Catapora" },
-        { id: "D", text: "Sarampo" }
-      ]
-    },
-    {
-      id: 5,
-      text: "Qual a principal medida preventiva contra surtos de Influenza (Gripe) na capital paulista?",
-      category: "Imunização & Prevenção",
-      correctOption: "A",
-      explanation: "A vacinação anual atualizada confere imunidade contra as cepas circulantes mais virulentas de influenza.",
-      options: [
-        { id: "A", text: "Vacinação anual nas Unidades Básicas de Saúde (UBS)" },
-        { id: "B", text: "Exposição ao sol ao meio-dia" },
-        { id: "C", text: "Uso de óculos escuros" },
-        { id: "D", text: "Uso de calçados impermeáveis" }
-      ]
-    }
-  ];
-
   const handleConfirmAnswer = () => {
     if (!selectedOption) return;
 
@@ -145,6 +270,8 @@ export default function GamePage() {
   };
 
   const handleReset = () => {
+    // Generate fresh new random non-repeating questions on reset
+    setQuestions(getRandomQuestions(5));
     setMode('quiz');
     setCurrentIdx(0);
     setSelectedOption(null);
@@ -348,8 +475,8 @@ export default function GamePage() {
             </div>
           </div>
 
-          {/* Metrics Overview 4-Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+          {/* Metrics Overview 3-Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
             <div style={{ backgroundColor: '#0F172A', padding: '16px', borderRadius: '12px', border: '1px solid #1E293B', textAlign: 'center' }}>
               <span style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 800, display: 'block' }}>Pontuação</span>
               <strong style={{ fontSize: '1.6rem', color: '#3B82F6' }}>{score}</strong>
@@ -366,12 +493,6 @@ export default function GamePage() {
               <span style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 800, display: 'block' }}>Tempo de Prova</span>
               <strong style={{ fontSize: '1.6rem', color: '#F8FAFC' }}>{formatTimer(timer)}</strong>
               <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block' }}>minutos:segundos</span>
-            </div>
-
-            <div style={{ backgroundColor: '#0F172A', padding: '16px', borderRadius: '12px', border: '1px solid #1E293B', textAlign: 'center' }}>
-              <span style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 800, display: 'block' }}>Status Final</span>
-              <strong style={{ fontSize: '1.1rem', color: '#10B981', display: 'block', marginTop: '6px' }}>APROVADO</strong>
-              <span style={{ fontSize: '0.7rem', color: '#34D399', display: 'block' }}>Apto para Vigilância</span>
             </div>
           </div>
 

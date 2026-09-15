@@ -20,7 +20,10 @@
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.5.0",
+    "localtunnel": "^2.0.2",
+    "tunnelmole": "^2.4.0",
     "typescript": "~5.8.0",
+    "untun": "^0.2.2",
     "vite": "^6.3.0"
   }
 }
