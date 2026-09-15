@@ -832,36 +832,11 @@ export default function MapPage() {
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             pointerEvents: 'none'
           }}>
-            {/* Left: 1-click basemap switches + settings button */}
-            <div className="gis-map-pill-group" style={{ pointerEvents: 'auto', gap: '4px' }}>
-              <button
-                type="button"
-                className={`gis-map-btn ${basemap === 'dark' ? 'active' : ''}`}
-                onClick={() => setBasemap('dark')}
-                title="Google Maps Dark Mode Suave"
-                style={{ fontSize: '0.8rem', fontWeight: 800 }}
-              >
-                🌙 Dark Suave
-              </button>
-              <button
-                type="button"
-                className={`gis-map-btn ${basemap === 'street' ? 'active' : ''}`}
-                onClick={() => setBasemap('street')}
-                title="Google Maps Padrão Claro"
-                style={{ fontSize: '0.8rem', fontWeight: 800 }}
-              >
-                ☀️ Maps Claro
-              </button>
-              <button
-                type="button"
-                className={`gis-map-btn ${basemap === 'satellite' ? 'active' : ''}`}
-                onClick={() => setBasemap('satellite')}
-                title="Google Satélite HD"
-                style={{ fontSize: '0.8rem', fontWeight: 800 }}
-              >
-                🛰️ Satélite
-              </button>
-
+            {/* Left: basemap label + settings button */}
+            <div className="gis-map-pill-group" style={{ pointerEvents: 'auto' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#94A3B8' }}>
+                {{ dark: '🌙 Dark', satellite: '🛰️ Satélite', street: '🏙️ Ruas', voyager: '🪐 Noturno' }[basemap]}
+              </span>
               {filterRisk !== 'Todos' && (
                 <span style={{
                   fontSize: '0.75rem', fontWeight: 800,
@@ -875,9 +850,9 @@ export default function MapPage() {
                 type="button"
                 className="gis-map-btn"
                 onClick={() => setSettingsOpen(o => !o)}
-                style={{ fontWeight: 900, color: settingsOpen ? '#60A5FA' : '#CBD5E1', gap: '4px' }}
+                style={{ fontWeight: 900, color: settingsOpen ? '#60A5FA' : '#CBD5E1', gap: '6px' }}
               >
-                ⚙️ Opções
+                ⚙️ Configurações
               </button>
             </div>
 
